@@ -138,12 +138,21 @@ window.pageJuzMap = { byGid: {
 } };
 const sharedToy = DE.generateSharedPartQuestion(toyGroup, [toyGroup], { quranTextFormat: 'standard', selection: { mode: 'all' }, pool: 'all', optionCap: 3 });
 const sharedToyJuz1 = DE.generateSharedPartQuestion(toyGroup, [toyGroup], { quranTextFormat: 'standard', selection: { mode: 'juz', juz: 1 }, pool: 'all', optionCap: 3 });
+const oldRandomForNoisy = Math.random;
+Math.random = () => 0.99;
+const sharedToyNoisy = DE.generateSharedPartQuestion(toyGroup, [toyGroup], { quranTextFormat: 'standard', selection: { mode: 'juz', juz: 1 }, pool: 'confined', optionMin: 5, optionCap: 5 });
+Math.random = oldRandomForNoisy;
 window.quranText = oldQuranText;
 window.pageJuzMap = oldPageJuzMap;
 assert(sharedToy && sharedToy.sharedText === 'rode', 'toy shared phrase should be "rode"');
 assert(sharedToy && sameLocations(sharedToy.correctLocations, [900001, 900002, 900004]), 'toy correct locations should include corpus occurrence 900004');
 assert(sharedToy && sharedToy.options.filter(o => sameLocations(o.locations, sharedToy.correctLocations)).length === 1, 'shared question should have exactly one correct option');
 assert(sharedToyJuz1 && sameLocations(sharedToyJuz1.correctLocations, [900001, 900002]), 'shared question should honor selected juz for correct locations');
+assert(sharedToyNoisy && sharedToyNoisy.options.length === 5, 'shared question should support five noisy options when available');
+assert(sharedToyNoisy && sharedToyNoisy.options.some(o => !sameLocations(o.locations, sharedToyNoisy.correctLocations) && o.locations.length > 1), 'shared noisy options should include wrong multi-location sets');
+sharedToyNoisy && sharedToyNoisy.options.flatMap(o => o.locations).forEach(g => {
+  assert([900001, 900002, 900003].includes(g), `confined noisy option leaked outside juz 1: ${g}`);
+});
 
 let sharedReal = null;
 for (const g of groups) {

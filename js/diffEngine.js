@@ -42,11 +42,17 @@ window.DiffEngine = {
       .map((x) => x.it);
   },
 
+  _optionLimit: function (settings) {
+    const max = Math.max(2, settings.optionCap || 3);
+    const min = Math.max(2, Math.min(max, settings.optionMin || max));
+    return min + Math.floor(Math.random() * (max - min + 1));
+  },
+
   /**
    * توليد سؤال من مجموعة متشابهات، بمفاتيح المواضع.
    * settings: {quranTextFormat, gapMode:'full'|'diff', contextCountBefore, contextCountAfter,
-   *            selection:{mode, surahs?, juz?, pageFrom?, pageTo?}, pool:'confined'|'all',
-   *            optionCap=3, distractorStrategy:'adaptive'|'random'}
+   *            selection:{mode, surahs?, juz?, juzs?, pageFrom?, pageTo?}, pool:'confined'|'all',
+   *            optionMin?, optionCap=3, distractorStrategy:'adaptive'|'random'}
    * @returns {object|null} كائن السؤال أو null إن تعذّر توليده.
    */
   generateQuestion: function (group, allGroups, settings = {}) {
@@ -146,7 +152,7 @@ window.DiffEngine = {
     const rankedDistractors = settings.distractorStrategy === 'random'
       ? shuffle(distractors)
       : this._rankBySimilarity(correctOpt.text, distractors, o => o.text);
-    const kept = [correctOpt, ...rankedDistractors.slice(0, (settings.optionCap || 3) - 1)];
+    const kept = [correctOpt, ...rankedDistractors.slice(0, this._optionLimit(settings) - 1)];
 
     // ponytail: slicing middles at the before/after boundary is clean-by-construction,
     // so the original ~80-line overlap-cleaning pass is unnecessary and removed.
@@ -201,7 +207,7 @@ window.DiffEngine = {
 
   /**
    * توليد سؤال: أي المواضع تشترك في جزء محدد؟
-   * settings: {quranTextFormat, selection, pool, optionCap=3}
+   * settings: {quranTextFormat, selection, pool, optionMin?, optionCap=3}
    */
   generateSharedPartQuestion: function (group, allGroups, settings = {}) {
     settings = Object.assign({
@@ -269,30 +275,42 @@ window.DiffEngine = {
       .filter(v => inSelection(v) && cleanText(v.text).includes(matchKey));
     if (corpusMatches.length < 2) return null;
 
-    const byGid = new Map([...verses, ...corpusMatches].map(v => [v.gid, v]));
+    const byGid = new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
     const correctLocations = corpusMatches.map(v => v.gid);
-    const allGids = Array.from(new Set([...verses.map(v => v.gid), ...correctLocations]));
     const optionFrom = (locations) => {
-      const ordered = allGids.filter(g => locations.includes(g));
+      const ordered = Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
       const refs = ordered.map(g => refOf(byGid.get(g)));
       return { text: refs.join(" • "), locations: ordered, refs: refs };
     };
 
     const wrongSets = [];
     const addWrong = (locations) => {
-      const ordered = allGids.filter(g => locations.includes(g));
+      const ordered = optionFrom(locations).locations;
       if (!ordered.length || sameSet(ordered, correctLocations) || wrongSets.some(s => sameSet(s, ordered))) return;
       wrongSets.push(ordered);
     };
 
-    const outsiders = allGids.filter(g => !correctLocations.includes(g));
-    correctLocations.forEach((gid, idx) => outsiders.forEach(g => addWrong(correctLocations.map((x, i) => i === idx ? g : x))));
+    const optionLimit = this._optionLimit(settings);
+    const fakePoolGids = Array.from(corpusByGid.values())
+      .filter(v => eligibleForPool(v))
+      .map(v => v.gid);
+    const outsiders = fakePoolGids.filter(g => !correctLocations.includes(g));
+
+    correctLocations.forEach((gid, idx) => shuffle(outsiders).slice(0, 8).forEach(g => addWrong(correctLocations.map((x, i) => i === idx ? g : x))));
+    shuffle(outsiders).slice(0, 8).forEach(g => addWrong([...correctLocations, g]));
     correctLocations.forEach(g => addWrong([g]));
-    allGids.forEach(g => addWrong([g]));
+    shuffle(fakePoolGids).slice(0, 12).forEach(g => addWrong([g]));
+
+    for (let i = 0; i < 80 && wrongSets.length < optionLimit * 4; i++) {
+      const maxSize = Math.min(fakePoolGids.length, Math.max(2, correctLocations.length + 2));
+      const minSize = Math.min(maxSize, correctLocations.length > 1 ? 2 : 1);
+      const size = minSize + Math.floor(Math.random() * (maxSize - minSize + 1));
+      addWrong(shuffle(fakePoolGids).slice(0, size));
+    }
 
     const options = shuffle([
       optionFrom(correctLocations),
-      ...shuffle(wrongSets).slice(0, (settings.optionCap || 3) - 1).map(optionFrom)
+      ...shuffle(wrongSets).slice(0, optionLimit - 1).map(optionFrom)
     ]);
     if (options.length < 2) return null;
 
