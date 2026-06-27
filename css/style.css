@@ -5,6 +5,10 @@
   --font-quran: 'Amiri', serif;
 }
 
+[v-cloak] {
+  display: none;
+}
+
 body {
   font-family: var(--font-sans);
   transition: background-color 0.3s ease, color 0.3s ease;
