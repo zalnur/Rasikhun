@@ -65,10 +65,10 @@ console.log(`   large groups tested: ${bigQs.length}, max options seen: ${Math.m
 bigQs.forEach(q => assert(q.options.length <= 3, `large group exceeded cap: ${q.options.length}`));
 
 // === 4. المجال: juz محدد ===
-console.log('4) selection confined to juz 2');
-const juz2 = gen(300, { gapMode: 'full', selection: { mode: 'juz', juz: 2 }, pool: 'all', optionCap: 3 });
+console.log('4) selection confined to juz 2 or 3');
+const juz2 = gen(300, { gapMode: 'full', selection: { mode: 'juz', juzs: [2, 3] }, pool: 'all', optionCap: 3 });
 juz2.forEach(q => {
-  assert(map[q.targetGid].juz === 2, `target not in juz 2: gid ${q.targetGid} → juz ${map[q.targetGid]?.juz}`);
+  assert([2, 3].includes(map[q.targetGid].juz), `target not in juz 2/3: gid ${q.targetGid} → juz ${map[q.targetGid]?.juz}`);
 });
 
 // === 5. المصدر confined: يجب أن تكون المشتتات داخل المجال ===

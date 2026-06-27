@@ -199,23 +199,47 @@
             <!-- المجال المختار (Selection) -->
             <div>
               <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">مجال الأسئلة:</label>
-              <div class="grid grid-cols-2 gap-2 mb-2">
-                <button v-for="m in [['all','كل السور'],['surahs','سور محددة'],['juz','جزء واحد'],['pages','صفحات']]" :key="m[0]"
+              <div class="grid grid-cols-2 gap-2 mb-3">
+                <button v-for="m in [['all','كل السور'],['surahs','سور محددة'],['juz','أجزاء محددة'],['pages','صفحات']]" :key="m[0]"
                   @click="selectionMode = m[0]"
                   :class="selectionMode === m[0] ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'"
                   class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">
                   {{ m[1] }}
                 </button>
               </div>
-              <select v-if="selectionMode === 'surahs'" v-model="selectedSurahs" multiple size="6" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option v-for="sura in availableSurahs" :key="sura.name" :value="sura.name">
-                  سورة {{ sura.name }} ({{ sura.count }})
-                </option>
-              </select>
-              <p v-if="selectionMode === 'surahs' && selectedSurahs.length === 0" class="text-xs text-slate-400 mt-1">لن يُطبق التصفية حتى تختار سورة واحدة على الأقل.</p>
-              <select v-if="selectionMode === 'juz'" v-model.number="selectedJuz" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option v-for="n in 30" :key="n" :value="n">الجزء {{ n }}</option>
-              </select>
+              <div v-if="selectionMode === 'surahs'" class="space-y-2">
+                <div class="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span>{{ selectedSurahs.length ? `${selectedSurahs.length} سور مختارة` : 'كل السور' }}</span>
+                  <button v-if="selectedSurahs.length" @click="selectedSurahs = []" class="text-brand-600 dark:text-brand-400 font-bold hover:underline">مسح الاختيار</button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                  <button v-for="sura in availableSurahs" :key="sura.name" type="button"
+                    @click="toggleSurah(sura.name)"
+                    :aria-pressed="selectedSurahs.includes(sura.name)"
+                    :class="selectedSurahs.includes(sura.name) ? 'bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-500/20' : 'bg-white/50 dark:bg-slate-900/70 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-400'"
+                    class="flex items-center justify-between gap-2 py-2 px-3 rounded-lg border text-sm font-bold transition-all duration-200">
+                    <span>سورة {{ sura.name }}</span>
+                    <span class="text-[11px] opacity-70">{{ sura.count }}</span>
+                  </button>
+                </div>
+                <p v-if="selectedSurahs.length === 0" class="text-xs text-slate-400">لن يُطبق التصفية حتى تختار سورة واحدة على الأقل.</p>
+              </div>
+              <div v-if="selectionMode === 'juz'" class="space-y-2">
+                <div class="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span>{{ selectedJuzSummary }}</span>
+                  <button v-if="selectedJuz.length" @click="selectedJuz = []" class="text-brand-600 dark:text-brand-400 font-bold hover:underline">مسح الاختيار</button>
+                </div>
+                <div class="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                  <button v-for="n in allJuz" :key="n" type="button"
+                    @click="toggleJuz(n)"
+                    :aria-pressed="selectedJuz.includes(n)"
+                    :class="selectedJuz.includes(n) ? 'bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-500/20' : 'bg-white/50 dark:bg-slate-900/70 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-400'"
+                    class="py-2 px-2 rounded-lg border text-sm font-bold transition-all duration-200">
+                    {{ n }}
+                  </button>
+                </div>
+                <p v-if="selectedJuz.length === 0" class="text-xs text-slate-400">لن يُطبق التصفية حتى تختار جزءاً واحداً على الأقل.</p>
+              </div>
               <div v-if="selectionMode === 'pages'" class="flex items-center gap-2">
                 <input type="number" min="1" :max="totalPages" v-model.number="pageFrom" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <span class="text-sm text-slate-500">إلى</span>

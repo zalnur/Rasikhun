@@ -16,7 +16,8 @@ window.Scope = {
     }
     if (m === 'juz') {
       const info = map && map[verse.gid];
-      return !!info && info.juz === selection.juz;
+      const juzs = Array.isArray(selection.juzs) ? selection.juzs : [selection.juz];
+      return !!info && juzs.includes(info.juz);
     }
     if (m === 'pages') {
       const info = map && map[verse.gid];
@@ -39,7 +40,12 @@ window.Scope = {
       if (s.length <= 3) return s.join('، ');
       return s.slice(0, 3).join('، ') + ` (+${s.length - 3})`;
     }
-    if (selection.mode === 'juz') return `الجزء ${selection.juz}`;
+    if (selection.mode === 'juz') {
+      const juzs = Array.isArray(selection.juzs) ? selection.juzs : [selection.juz];
+      if (juzs.length === 1) return `الجزء ${juzs[0]}`;
+      if (juzs.length <= 3) return juzs.map(n => `الجزء ${n}`).join('، ');
+      return `${juzs.length} أجزاء`;
+    }
     if (selection.mode === 'pages') return `الصفحات ${selection.pageFrom}–${selection.pageTo}`;
     return '';
   }

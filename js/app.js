@@ -33,7 +33,7 @@ createApp({
     // المجال المختار (Selection) — راجع CONTEXT.md
     const selectionMode = ref('all');            // all | surahs | juz | pages
     const selectedSurahs = ref([]);              // مصفوفة أسماء سور (وضع surahs)
-    const selectedJuz = ref(1);                  // 1..30 (وضع juz)
+    const selectedJuz = ref([1]);                // مصفوفة أجزاء (وضع juz)
     const pageFrom = ref(1);                     // (وضع pages)
     const pageTo = ref(604);
 
@@ -50,14 +50,21 @@ createApp({
 
     // السور المتاحة (للاختيار المتعدد)
     const availableSurahs = computed(() => {
-      const counts = {};
+      const surahs = {};
       similaritiesData.value.forEach(g => g.verses && g.verses.forEach(v => {
-        counts[v.sura_name] = (counts[v.sura_name] || 0) + 1;
+        surahs[v.sura_name] ||= { name: v.sura_name, count: 0, order: v.sura_id };
+        surahs[v.sura_name].count++;
       }));
-      return Object.keys(counts).map(s => ({ name: s, count: counts[s] })).sort((a, b) => b.count - a.count);
+      return Object.values(surahs).sort((a, b) => a.order - b.order);
     });
 
     const currentQuestion = computed(() => questions.value[currentIndex.value] || null);
+    const allJuz = Array.from({ length: 30 }, (_, i) => i + 1);
+    const selectedJuzSummary = computed(() => {
+      if (selectedJuz.value.length === 0) return 'كل الأجزاء';
+      if (selectedJuz.value.length <= 4) return selectedJuz.value.map(n => `الجزء ${n}`).join('، ');
+      return `${selectedJuz.value.length} أجزاء`;
+    });
 
     // كائن المجال المختار كما يفهمه Scope/Engine
     const buildSelection = () => {
@@ -65,12 +72,25 @@ createApp({
         const s = selectedSurahs.value.length ? selectedSurahs.value : availableSurahs.value.map(s => s.name);
         return { mode: 'surahs', surahs: s };
       }
-      if (selectionMode.value === 'juz') return { mode: 'juz', juz: selectedJuz.value };
+      if (selectionMode.value === 'juz') {
+        const juzs = selectedJuz.value.length ? selectedJuz.value : allJuz;
+        return { mode: 'juz', juzs };
+      }
       if (selectionMode.value === 'pages') {
         const f = Math.min(pageFrom.value, pageTo.value), t = Math.max(pageFrom.value, pageTo.value);
         return { mode: 'pages', pageFrom: f, pageTo: t };
       }
       return { mode: 'all' };
+    };
+    const toggleInList = (listRef, value) => {
+      listRef.value = listRef.value.includes(value)
+        ? listRef.value.filter(v => v !== value)
+        : [...listRef.value, value];
+    };
+    const toggleSurah = (name) => toggleInList(selectedSurahs, name);
+    const toggleJuz = (n) => {
+      toggleInList(selectedJuz, n);
+      selectedJuz.value.sort((a, b) => a - b);
     };
 
     // هل الخيار صحيح؟ (مقارنة بالموضع، لا بالنص)
@@ -221,11 +241,12 @@ createApp({
       isLoaded, currentScreen, darkMode,
       quizLength, quizType, mixedStrategy, questions, currentIndex, score, selectedAnswer, isAnswered, quizHistory,
       totalMutashabihat, totalVerses, totalPages, availableSurahs, currentQuestion,
+      allJuz, selectedJuzSummary,
       showAdvancedSettings, quranTextFormat, gapMode, contextCountBefore, contextCountAfter,
       selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, distractorStrategy,
       starvedDialog,
       isCorrectOption, isSelectedOption,
-      toggleDarkMode, startQuiz, selectAnswer, nextQuestion, resetQuiz,
+      toggleDarkMode, toggleSurah, toggleJuz, startQuiz, selectAnswer, nextQuestion, resetQuiz,
       starvedRunPartial, starvedWidenPool
     };
   }
