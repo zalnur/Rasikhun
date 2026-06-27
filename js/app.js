@@ -131,7 +131,8 @@ createApp({
         contextCountAfter: parseInt(contextCountAfter.value),
         selection: sel,
         pool: overridePool || pool.value,
-        optionCap: 3,
+        optionMin: 3,
+        optionCap: 5,
         distractorStrategy: distractorStrategy.value,
         quizType: quizType.value,
         mixedStrategy: mixedStrategy.value

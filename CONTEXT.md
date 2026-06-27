@@ -29,7 +29,7 @@ A Question that names a wording segment discovered from a Group, and asks which 
 _Avoid_: phrase quiz, count quiz.
 
 **Option** (خيار):
-An answer choice offered for a Question. In a completion Question it offers wording; in a Shared-Part Question it offers a set of Locations. An Option has a *display text* (which may be shared by several Locations) and is *keyed by Location*. Identical-wording Locations collapse to a single Option at question time; their distinct Locations are revealed only after answering.
+An answer choice offered for a Question. In a completion Question it offers wording; in a Shared-Part Question it offers a set of Locations. An Option has a *display text* (which may be shared by several Locations) and is *keyed by Location*. Identical-wording Locations collapse to a single Option at question time; their distinct Locations are revealed only after answering. Incorrect Shared-Part Options may be deliberately synthetic Location sets, as long as they stay within the active Comparison Pool.
 _Avoid_: choice, answer-button, distractor.
 
 **Correct Answer** (الموضع الصحيح):
