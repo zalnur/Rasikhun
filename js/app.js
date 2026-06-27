@@ -1,5 +1,6 @@
 // app.js
 // إدارة حالة التطبيق والمنطق التفاعلي باستخدام Vue 3
+// الأسئلة بمفاتيح المواضع (Location-keyed) — راجع CONTEXT.md و ADR-0001.
 
 const { createApp, ref, computed, onMounted } = Vue;
 
@@ -8,125 +9,134 @@ createApp({
     // حالة التطبيق العامة
     const similaritiesData = ref([]);
     const isLoaded = ref(false);
-    const currentScreen = ref("welcome"); // welcome, quiz, result
-    const darkMode = ref(true); // الوضع المظلم افتراضي لجمالية التصميم
+    const currentScreen = ref("welcome");
+    const darkMode = ref(true);
 
     // إعدادات الاختبار
     const quizLength = ref(10);
+    const quizType = ref('completion'); // completion | sharedPart | mixed
+    const mixedStrategy = ref('balanced'); // balanced | random
     const questions = ref([]);
     const currentIndex = ref(0);
     const score = ref(0);
-    const selectedAnswer = ref(null);
+    const selectedAnswer = ref(null);   // كائن الخيار المختار {text, locations, refs}
     const isAnswered = ref(false);
-    const quizHistory = ref([]); // مراجعة الإجابات في النهاية
+    const quizHistory = ref([]);
 
-    // إعدادات متقدمة
+    // إعدادات متقدمة (موجودة مسبقاً)
     const showAdvancedSettings = ref(false);
-    const quranTextFormat = ref('uthmani'); // 'uthmani' or 'standard'
-    const gapMode = ref('full'); // 'diff' or 'full'
-    const contextCountBefore = ref(1); // 0 to 3
-    const contextCountAfter = ref(1); // 0 to 3
-    const selectedSurah = ref('all'); // 'all' or sura_name
+    const quranTextFormat = ref('uthmani');
+    const gapMode = ref('full');
+    const contextCountBefore = ref(1);
+    const contextCountAfter = ref(1);
 
-    // إحصائيات عامة عن البيانات
+    // المجال المختار (Selection) — راجع CONTEXT.md
+    const selectionMode = ref('all');            // all | surahs | juz | pages
+    const selectedSurahs = ref([]);              // مصفوفة أسماء سور (وضع surahs)
+    const selectedJuz = ref(1);                  // 1..30 (وضع juz)
+    const pageFrom = ref(1);                     // (وضع pages)
+    const pageTo = ref(604);
+
+    // مصدر المشتتات (Comparison Pool) + استراتيجية التشتيت (Distractor Selection)
+    const pool = ref('all');                     // all | confined
+    const distractorStrategy = ref('adaptive');  // adaptive | random
+
+    // نافذة النطاق المحدود (Q4) — راجع CONTEXT.md
+    const starvedDialog = ref(null);             // {count, requested, pending} | null
+
     const totalMutashabihat = computed(() => similaritiesData.value.length);
-    const totalVerses = computed(() => {
-      return similaritiesData.value.reduce((acc, curr) => acc + (curr.verses ? curr.verses.length : 0), 0);
-    });
+    const totalVerses = computed(() => similaritiesData.value.reduce((a, c) => a + (c.verses ? c.verses.length : 0), 0));
+    const totalPages = computed(() => (window.pageJuzMap && window.pageJuzMap.totalPages) || 604);
 
-    // السور المتاحة للاختبار
+    // السور المتاحة (للاختيار المتعدد)
     const availableSurahs = computed(() => {
       const counts = {};
-      similaritiesData.value.forEach(group => {
-        if (group.verses) {
-          group.verses.forEach(v => {
-            if (!counts[v.sura_name]) counts[v.sura_name] = 0;
-            // Count each mutashabih verse as a potential question for that surah
-            counts[v.sura_name]++;
-          });
-        }
-      });
-      return Object.keys(counts).map(sura => ({
-        name: sura,
-        count: counts[sura]
-      })).sort((a, b) => b.count - a.count);
+      similaritiesData.value.forEach(g => g.verses && g.verses.forEach(v => {
+        counts[v.sura_name] = (counts[v.sura_name] || 0) + 1;
+      }));
+      return Object.keys(counts).map(s => ({ name: s, count: counts[s] })).sort((a, b) => b.count - a.count);
     });
 
-    // السؤال الحالي
-    const currentQuestion = computed(() => {
-      return questions.value[currentIndex.value] || null;
-    });
+    const currentQuestion = computed(() => questions.value[currentIndex.value] || null);
 
-    // تحميل البيانات عند بدء التشغيل
+    // كائن المجال المختار كما يفهمه Scope/Engine
+    const buildSelection = () => {
+      if (selectionMode.value === 'surahs') {
+        const s = selectedSurahs.value.length ? selectedSurahs.value : availableSurahs.value.map(s => s.name);
+        return { mode: 'surahs', surahs: s };
+      }
+      if (selectionMode.value === 'juz') return { mode: 'juz', juz: selectedJuz.value };
+      if (selectionMode.value === 'pages') {
+        const f = Math.min(pageFrom.value, pageTo.value), t = Math.max(pageFrom.value, pageTo.value);
+        return { mode: 'pages', pageFrom: f, pageTo: t };
+      }
+      return { mode: 'all' };
+    };
+
+    // هل الخيار صحيح؟ (مقارنة بالموضع، لا بالنص)
+    const sameLocations = (a, b) => a.length === b.length && a.every(g => b.includes(g));
+    const isCorrectOption = (option) => {
+      const q = currentQuestion.value;
+      if (!option || !q) return false;
+      if (q.type === 'sharedPart') return sameLocations(option.locations, q.correctLocations);
+      return option.locations.includes(q.correctAnswer);
+    };
+    const isSelectedOption = (option) => selectedAnswer.value && selectedAnswer.value.text === option.text;
+
     onMounted(async () => {
       try {
-        if (window.similaritiesData) {
-          similaritiesData.value = window.similaritiesData;
-        } else {
-          const response = await fetch("data/similarities.json");
-          similaritiesData.value = await response.json();
-        }
+        similaritiesData.value = window.similaritiesData || await (await fetch("data/similarities.json")).json();
         isLoaded.value = true;
-        
-        // التحقق من الوضع المفضل للمستخدم أو ضبط الوضع المظلم كافتراضي
-        if (localStorage.getItem("theme") === "light") {
-          darkMode.value = false;
-        }
+        if (localStorage.getItem("theme") === "light") darkMode.value = false;
         applyTheme();
-      } catch (error) {
-        console.error("فشل تحميل ملف المتشابهات:", error);
-        alert("حدث خطأ أثناء تحميل بيانات التطبيق. يرجى التأكد من تشغيل الخادم المحلي بشكل صحيح.");
+      } catch (e) {
+        console.error("فشل تحميل بيانات المتشابهات:", e);
+        alert("حدث خطأ أثناء تحميل بيانات التطبيق.");
       }
     });
 
-    // تطبيق السمة (داكن/مضيء)
     const applyTheme = () => {
-      if (darkMode.value) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("theme", "dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("theme", "light");
+      document.documentElement.classList.toggle("dark", darkMode.value);
+      localStorage.setItem("theme", darkMode.value ? "dark" : "light");
+    };
+    const toggleDarkMode = () => { darkMode.value = !darkMode.value; applyTheme(); };
+
+    // توليد الأسئلة لمجموعات الهدف (مع تجاوز pool اختياري لملء النطاق المحدود)
+    const generateAll = (overridePool) => {
+      const sel = buildSelection();
+      const settings = {
+        quranTextFormat: quranTextFormat.value,
+        gapMode: gapMode.value,
+        contextCountBefore: parseInt(contextCountBefore.value),
+        contextCountAfter: parseInt(contextCountAfter.value),
+        selection: sel,
+        pool: overridePool || pool.value,
+        optionCap: 3,
+        distractorStrategy: distractorStrategy.value,
+        quizType: quizType.value,
+        mixedStrategy: mixedStrategy.value
+      };
+      const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
+      const targetGroups = similaritiesData.value
+        .filter(g => g.verses && g.verses.some(v => window.Scope.inSelection(v, sel, map)))
+        .sort(() => Math.random() - 0.5);
+
+      const out = [];
+      if (quizType.value === 'mixed') {
+        return window.DiffEngine.generateMixedQuestions(targetGroups, similaritiesData.value, settings, quizLength.value);
       }
+      for (const g of targetGroups) {
+        if (out.length >= quizLength.value) break;
+        const q = quizType.value === 'sharedPart'
+          ? window.DiffEngine.generateSharedPartQuestion(g, similaritiesData.value, settings)
+          : window.DiffEngine.generateQuestion(g, similaritiesData.value, settings);
+        if (q) out.push(q);
+      }
+      return out;
     };
 
-    const toggleDarkMode = () => {
-      darkMode.value = !darkMode.value;
-      applyTheme();
-    };
-
-    // بدء الاختبار
-    const startQuiz = () => {
-      if (similaritiesData.value.length === 0) return;
-
-      // تصفية حسب السورة إذا لزم الأمر
-      let filteredGroups = similaritiesData.value;
-      if (selectedSurah.value !== 'all') {
-        filteredGroups = similaritiesData.value.filter(group => {
-          return group.verses.some(v => v.sura_name === selectedSurah.value);
-        });
-      }
-
-      // اختيار مجموعات عشوائية بناءً على طول الاختبار المختار
-      const shuffledGroups = [...filteredGroups].sort(() => Math.random() - 0.5);
-      const selectedGroups = shuffledGroups.slice(0, Math.min(quizLength.value, shuffledGroups.length));
-
-      // توليد الأسئلة باستخدام DiffEngine
-      questions.value = selectedGroups
-        .map(group => window.DiffEngine.generateQuestion(group, similaritiesData.value, {
-          quranTextFormat: quranTextFormat.value,
-          gapMode: gapMode.value,
-          contextCountBefore: parseInt(contextCountBefore.value),
-          contextCountAfter: parseInt(contextCountAfter.value),
-          selectedSurah: selectedSurah.value
-        }))
-        .filter(q => q !== null); // تصفية أي أسئلة فشل توليدها
-
-      if (questions.value.length === 0) {
-        alert("لم نتمكن من توليد أسئلة كافية. يرجى المحاولة مرة أخرى.");
-        return;
-      }
-
+    const beginWith = (qs) => {
+      questions.value = qs;
       currentIndex.value = 0;
       score.value = 0;
       selectedAnswer.value = null;
@@ -135,28 +145,51 @@ createApp({
       currentScreen.value = "quiz";
     };
 
-    // اختيار إجابة
+    const startQuiz = () => {
+      if (similaritiesData.value.length === 0) return;
+      const generated = generateAll();
+      if (generated.length === 0) {
+        alert("لا توجد متشابهات كافية في هذا النطاق. وسّع المجال أو بدّل مصدر الخيارات.");
+        return;
+      }
+      if (generated.length < quizLength.value) {
+        // Q4: نطاق محدود — اعرض خيار صريح بدل التوسّع الصامت
+        starvedDialog.value = { count: generated.length, requested: quizLength.value, pending: generated };
+        return;
+      }
+      beginWith(generated);
+    };
+
+    const starvedRunPartial = () => { const p = starvedDialog.value.pending; starvedDialog.value = null; beginWith(p); };
+    const starvedWidenPool = () => {
+      starvedDialog.value = null;
+      const filled = generateAll('all'); // وسّع مصدر الخيارات لإكمال العدد
+      beginWith(filled.length ? filled : generateAll());
+    };
+
     const selectAnswer = (option) => {
       if (isAnswered.value) return;
-
       selectedAnswer.value = option;
       isAnswered.value = true;
-      const isCorrect = option === currentQuestion.value.correctAnswer;
-
-      if (isCorrect) {
-        score.value++;
-        triggerConfetti();
-      }
-
-      // حفظ السؤال في السجل للمراجعة
+      const correct = isCorrectOption(option);
+      if (correct) { score.value++; triggerConfetti(); }
+      const q = currentQuestion.value;
+      const correctOpt = q.options.find(o => isCorrectOption(o));
       quizHistory.value.push({
-        ...currentQuestion.value,
-        userAnswer: option,
-        isCorrect: isCorrect
+        type: q.type || 'completion',
+        suraName: q.suraName, ayaId: q.ayaId,
+        before: q.before, after: q.after,
+        beforeVerses: q.beforeVerses, afterVerses: q.afterVerses,
+        userAnswerText: option.text,
+        correctAnswerText: correctOpt ? correctOpt.text : '',
+        correctOptionRefs: correctOpt ? correctOpt.refs : [],
+        sharedText: q.sharedText,
+        matchingVerses: q.matchingVerses || [],
+        comparisonSurah: q.comparisonSurah, comparisonAya: q.comparisonAya, comparisonText: q.comparisonText,
+        isCorrect: correct
       });
     };
 
-    // الانتقال للسؤال التالي
     const nextQuestion = () => {
       if (currentIndex.value < questions.value.length - 1) {
         currentIndex.value++;
@@ -167,7 +200,6 @@ createApp({
       }
     };
 
-    // إعادة الاختبار
     const resetQuiz = () => {
       currentScreen.value = "welcome";
       questions.value = [];
@@ -176,46 +208,25 @@ createApp({
       selectedAnswer.value = null;
       isAnswered.value = false;
       quizHistory.value = [];
+      starvedDialog.value = null;
     };
 
-    // تأثير الاحتفال (Confetti) عند الإجابة الصحيحة
     const triggerConfetti = () => {
       if (typeof confetti === "function") {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.8 },
-          colors: ["#10b981", "#34d399", "#6ee7b7", "#a7f3d0"]
-        });
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 }, colors: ["#10b981", "#34d399", "#6ee7b7", "#a7f3d0"] });
       }
     };
 
     return {
-      isLoaded,
-      currentScreen,
-      darkMode,
-      quizLength,
-      currentIndex,
-      score,
-      selectedAnswer,
-      isAnswered,
-      quizHistory,
-      totalMutashabihat,
-      totalVerses,
-      availableSurahs,
-      currentQuestion,
-      questions,
-      showAdvancedSettings,
-      quranTextFormat,
-      gapMode,
-      contextCountBefore,
-      contextCountAfter,
-      selectedSurah,
-      toggleDarkMode,
-      startQuiz,
-      selectAnswer,
-      nextQuestion,
-      resetQuiz
+      isLoaded, currentScreen, darkMode,
+      quizLength, quizType, mixedStrategy, questions, currentIndex, score, selectedAnswer, isAnswered, quizHistory,
+      totalMutashabihat, totalVerses, totalPages, availableSurahs, currentQuestion,
+      showAdvancedSettings, quranTextFormat, gapMode, contextCountBefore, contextCountAfter,
+      selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, distractorStrategy,
+      starvedDialog,
+      isCorrectOption, isSelectedOption,
+      toggleDarkMode, startQuiz, selectAnswer, nextQuestion, resetQuiz,
+      starvedRunPartial, starvedWidenPool
     };
   }
 }).mount("#app");
