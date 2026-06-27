@@ -44,7 +44,7 @@
   <div id="app" class="w-full flex-grow flex flex-col items-center justify-center py-8 px-4" v-cloak>
     
     <!-- زر تبديل الوضع الليلي / النهاري -->
-    <div class="fixed top-4 left-4 z-50">
+    <div v-if="currentScreen !== 'quiz'" class="fixed top-4 left-4 z-50">
       <button @click="toggleDarkMode" class="p-3 rounded-full glass-panel shadow-lg hover:scale-110 active:scale-95 transition-all duration-200">
         <!-- Sun Icon (Light Mode) -->
         <svg v-if="darkMode" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -55,6 +55,32 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
         </svg>
       </button>
+    </div>
+
+    <!-- نافذة النطاق المحدود (Q4) — خيار صريح بدل التوسّع الصامت -->
+    <div v-if="starvedDialog" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div class="glass-panel rounded-3xl p-8 max-w-md w-full text-center shadow-2xl fade-in">
+        <div class="inline-flex p-3 rounded-full bg-amber-500/15 mb-4 text-amber-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 class="text-xl font-extrabold text-slate-800 dark:text-slate-100 mb-2">هذا النطاق محدود</h3>
+        <p class="text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+          يحتوي النطاق المختار على <strong class="text-brand-600 dark:text-brand-400">{{ starvedDialog.count }}</strong> سؤال فقط من أصل <strong>{{ starvedDialog.requested }}</strong> المطلوبة. كيف تريد المتابعة؟
+        </p>
+        <div class="flex flex-col gap-3">
+          <button @click="starvedRunPartial" class="py-3 px-6 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all duration-200">
+            إجراء اختبار بـ {{ starvedDialog.count }} سؤال
+          </button>
+          <button @click="starvedWidenPool" class="py-3 px-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 active:scale-95 transition-all duration-200">
+            توسيع مصدر الخيارات لإكمال {{ starvedDialog.requested }} سؤال
+          </button>
+          <button @click="starvedDialog = null" class="py-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-medium transition-colors">
+            إلغاء
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- شاشة التحميل -->
@@ -114,6 +140,27 @@
           </div>
         </div>
 
+        <div class="max-w-md mx-auto mb-8">
+          <label class="block text-sm font-semibold text-slate-500 dark:text-slate-400 mb-3 text-right">نوع الاختبار:</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button @click="quizType = 'completion'"
+              :class="quizType === 'completion' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'"
+              class="py-3 px-2 rounded-xl font-bold transition-all duration-200">
+              التكملة
+            </button>
+            <button @click="quizType = 'sharedPart'"
+              :class="quizType === 'sharedPart' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'"
+              class="py-3 px-2 rounded-xl font-bold transition-all duration-200">
+              المواضع المشتركة
+            </button>
+            <button @click="quizType = 'mixed'"
+              :class="quizType === 'mixed' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'"
+              class="py-3 px-2 rounded-xl font-bold transition-all duration-200">
+              مختلط
+            </button>
+          </div>
+        </div>
+
         <!-- إعدادات متقدمة -->
         <div class="max-w-md mx-auto mb-8 text-right">
           <button @click="showAdvancedSettings = !showAdvancedSettings" class="text-sm text-brand-600 dark:text-brand-400 font-bold hover:underline mb-3 flex items-center gap-1">
@@ -132,7 +179,14 @@
                 <option value="standard">الرسم الإملائي</option>
               </select>
             </div>
-            <div>
+            <div v-if="quizType === 'mixed'">
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">طريقة المزج:</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button @click="mixedStrategy = 'balanced'" :class="mixedStrategy === 'balanced' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'" class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">متوازن</button>
+                <button @click="mixedStrategy = 'random'" :class="mixedStrategy === 'random' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'" class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">عشوائي</button>
+              </div>
+            </div>
+            <div v-if="quizType !== 'sharedPart'">
               <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">طريقة عرض الفراغ:</label>
               <select v-model="gapMode" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <option value="full">إخفاء الآية بالكامل</option>
@@ -145,7 +199,7 @@
                 بعض الخيارات قد لا تكون منطقية في حال اختيار هذا الخيار.
               </p>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div v-if="quizType !== 'sharedPart'" class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">آيات السياق (قبل):</label>
                 <select v-model="contextCountBefore" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
@@ -165,14 +219,53 @@
                 </select>
               </div>
             </div>
+            <!-- المجال المختار (Selection) -->
             <div>
-              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">تصفية حسب السورة:</label>
-              <select v-model="selectedSurah" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
-                <option value="all">جميع السور</option>
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">مجال الأسئلة:</label>
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <button v-for="m in [['all','كل السور'],['surahs','سور محددة'],['juz','جزء واحد'],['pages','صفحات']]" :key="m[0]"
+                  @click="selectionMode = m[0]"
+                  :class="selectionMode === m[0] ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'"
+                  class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">
+                  {{ m[1] }}
+                </button>
+              </div>
+              <select v-if="selectionMode === 'surahs'" v-model="selectedSurahs" multiple size="6" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
                 <option v-for="sura in availableSurahs" :key="sura.name" :value="sura.name">
-                  سورة {{ sura.name }} ({{ sura.count }} سؤال)
+                  سورة {{ sura.name }} ({{ sura.count }})
                 </option>
               </select>
+              <p v-if="selectionMode === 'surahs' && selectedSurahs.length === 0" class="text-xs text-slate-400 mt-1">لن يُطبق التصفية حتى تختار سورة واحدة على الأقل.</p>
+              <select v-if="selectionMode === 'juz'" v-model.number="selectedJuz" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <option v-for="n in 30" :key="n" :value="n">الجزء {{ n }}</option>
+              </select>
+              <div v-if="selectionMode === 'pages'" class="flex items-center gap-2">
+                <input type="number" min="1" :max="totalPages" v-model.number="pageFrom" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                <span class="text-sm text-slate-500">إلى</span>
+                <input type="number" min="1" :max="totalPages" v-model.number="pageTo" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-500">
+              </div>
+            </div>
+
+            <!-- مصدر الخيارات/المشتتات (Comparison Pool) -->
+            <div>
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                {{ quizType === 'sharedPart' ? 'مصدر خيارات المواضع:' : (quizType === 'mixed' ? 'مصدر خيارات الاختبار:' : 'مصدر المشتتات:') }}
+              </label>
+              <div class="grid grid-cols-2 gap-2">
+                <button @click="pool = 'confined'" :class="pool === 'confined' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'" class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">ضمن المجال فقط</button>
+                <button @click="pool = 'all'" :class="pool === 'all' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'" class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">
+                  {{ quizType === 'sharedPart' ? 'كل مواضع المجموعة' : (quizType === 'mixed' ? 'خارج المجال مسموح' : 'ضد كل السور') }}
+                </button>
+              </div>
+            </div>
+
+            <!-- استراتيجية التشتيت (Distractor Selection) -->
+            <div v-if="quizType !== 'sharedPart'">
+              <label class="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">طريقة اختيار الخيارات:</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button @click="distractorStrategy = 'adaptive'" :class="distractorStrategy === 'adaptive' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'" class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">الأقرب تشابهاً</button>
+                <button @click="distractorStrategy = 'random'" :class="distractorStrategy === 'random' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20 scale-105' : 'bg-white/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'" class="py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200">عشوائي</button>
+              </div>
             </div>
           </div>
         </div>
@@ -208,12 +301,22 @@
         <!-- كرت الآية (السؤال) -->
         <div class="glass-panel rounded-3xl p-6 md:p-8 shadow-2xl relative">
           <!-- اسم السورة ورقم الآية -->
-          <div class="inline-flex px-4 py-1.5 rounded-full bg-brand-500/10 dark:bg-brand-400/10 border border-brand-500/20 dark:border-brand-400/20 text-brand-700 dark:text-brand-300 font-bold text-sm mb-4">
+          <div v-if="currentQuestion.type !== 'sharedPart'" class="inline-flex px-4 py-1.5 rounded-full bg-brand-500/10 dark:bg-brand-400/10 border border-brand-500/20 dark:border-brand-400/20 text-brand-700 dark:text-brand-300 font-bold text-sm mb-4">
             سورة {{ currentQuestion.suraName }} - آية {{ currentQuestion.ayaId }}
+          </div>
+          <div v-else class="inline-flex px-4 py-1.5 rounded-full bg-brand-500/10 dark:bg-brand-400/10 border border-brand-500/20 dark:border-brand-400/20 text-brand-700 dark:text-brand-300 font-bold text-sm mb-4">
+            مواضع الجزء المشترك
           </div>
 
           <!-- نص السؤال مع السياق -->
-          <div class="quran-text text-2xl md:text-3xl leading-relaxed text-slate-800 dark:text-slate-100 font-medium space-y-5 text-right mt-2">
+          <div v-if="currentQuestion.type === 'sharedPart'" class="space-y-4 text-right mt-2">
+            <p class="text-base font-bold text-slate-600 dark:text-slate-300">أين ورد هذا الجزء؟</p>
+            <div class="quran-text text-2xl md:text-3xl leading-relaxed text-slate-800 dark:text-slate-100 font-medium block p-5 bg-brand-50 dark:bg-slate-800/80 rounded-2xl border border-brand-100 dark:border-slate-700 shadow-sm">
+              {{ currentQuestion.sharedText }}
+            </div>
+          </div>
+
+          <div v-else class="quran-text text-2xl md:text-3xl leading-relaxed text-slate-800 dark:text-slate-100 font-medium space-y-5 text-right mt-2">
             
             <!-- الآيات السابقة (السياق) -->
             <div v-for="verse in currentQuestion.beforeVerses" :key="'before-'+verse.aya_id" class="block">
@@ -227,9 +330,9 @@
               <span>{{ currentQuestion.before }} </span>
               <span class="inline-block px-4 py-1 mx-1 rounded-xl border-2 border-dashed text-xl md:text-2xl transition-all duration-300"
                 :class="isAnswered 
-                  ? (selectedAnswer === currentQuestion.correctAnswer ? 'bg-emerald-500/20 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 border-red-500 text-red-600 dark:text-red-400')
+                  ? (isCorrectOption(selectedAnswer) ? 'bg-emerald-500/20 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/20 border-red-500 text-red-600 dark:text-red-400')
                   : 'bg-brand-500/5 border-brand-400/30 text-brand-600 dark:text-brand-400 animate-pulse'">
-                <span v-if="isAnswered">{{ selectedAnswer || '[...]' }}</span>
+                <span v-if="isAnswered">{{ selectedAnswer ? selectedAnswer.text : '[...]' }}</span>
                 <span v-else>[...]</span>
               </span>
               <span>{{ currentQuestion.after }}</span>
@@ -250,25 +353,29 @@
             @click="selectAnswer(option)"
             :disabled="isAnswered"
             :class="[
-              isAnswered 
-                ? (option === currentQuestion.correctAnswer 
+              isAnswered
+                ? (isCorrectOption(option)
                     ? 'bg-emerald-500/20 border-emerald-500 text-emerald-800 dark:text-emerald-200 font-bold dark:border-emerald-400 pulse-glow-correct' 
-                    : (option === selectedAnswer 
+                    : (isSelectedOption(option)
                         ? 'bg-red-500/20 border-red-500 text-red-800 dark:text-red-200 dark:border-red-400' 
                         : 'bg-white/30 dark:bg-slate-800/30 border-slate-200/50 dark:border-slate-700/50 opacity-60'))
                 : 'glass-card text-slate-700 dark:text-slate-200 hover:border-brand-500 dark:hover:border-brand-400'
             ]"
             class="p-5 rounded-2xl border text-right text-lg md:text-xl font-medium transition-all duration-200 flex items-center justify-between gap-4">
             
-            <span class="quran-text leading-snug">{{ option }}</span>
+            <span class="flex flex-col items-start gap-1">
+              <span class="quran-text leading-snug">{{ option.text }}</span>
+              <!-- كشف المواضع بعد الإجابة (التوجيه: «أين تظهر») -->
+              <span v-if="isAnswered && currentQuestion.type !== 'sharedPart'" class="text-xs font-normal text-slate-500 dark:text-slate-400">تظهر في: {{ option.refs.join(' • ') }}</span>
+            </span>
             
             <!-- علامة حالة الإجابة -->
-            <span v-if="isAnswered && option === currentQuestion.correctAnswer" class="text-emerald-500 shrink-0">
+            <span v-if="isAnswered && isCorrectOption(option)" class="text-emerald-500 shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </span>
-            <span v-else-if="isAnswered && option === selectedAnswer && option !== currentQuestion.correctAnswer" class="text-red-500 shrink-0">
+            <span v-else-if="isAnswered && isSelectedOption(option)" class="text-red-500 shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -284,7 +391,19 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div>
+            <div v-if="currentQuestion.type === 'sharedPart'">
+              <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-1">المواضع الصحيحة:</h4>
+              <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
+                ورد هذا الجزء في المواضع الآتية:
+              </p>
+              <div class="space-y-2">
+                <div v-for="verse in currentQuestion.matchingVerses" :key="'match-'+verse.gid" class="bg-slate-100/50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                  <span class="block text-xs font-bold text-brand-600 dark:text-brand-400 mb-1">{{ verse.ref }}</span>
+                  <span class="quran-text text-lg text-slate-700 dark:text-slate-300 leading-loose">"{{ verse.text }}"</span>
+                </div>
+              </div>
+            </div>
+            <div v-else>
               <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-1">وجه الشبه والتوجيه:</h4>
               <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                 تقابلها آية مشابهة في <strong class="text-brand-600 dark:text-brand-400">سورة {{ currentQuestion.comparisonSurah }} - آية {{ currentQuestion.comparisonAya }}</strong>:
@@ -377,7 +496,7 @@
               </div>
 
               <!-- نص السؤال مع السياق بالإجابة المختارة -->
-              <div class="quran-text text-xl leading-loose space-y-3">
+              <div v-if="item.type !== 'sharedPart'" class="quran-text text-xl leading-loose space-y-3">
                 <div v-for="verse in item.beforeVerses" :key="'hist-before-'+verse.aya_id" class="text-slate-600 dark:text-slate-400 text-lg">
                   <span class="text-xs bg-slate-100 dark:bg-slate-800 px-1.5 rounded mr-1">آية {{ verse.aya_id }}</span>
                   {{ verse.text }}
@@ -388,7 +507,7 @@
                   <span>{{ item.before }} </span>
                   <span class="inline-block px-2 rounded-lg text-base mx-1 font-bold"
                     :class="item.isCorrect ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'">
-                    {{ item.userAnswer }}
+                    {{ item.userAnswerText }}
                   </span>
                   <span>{{ item.after }}</span>
                   <span class="text-xs text-slate-500 dark:text-slate-400 block mt-2 text-left">
@@ -401,12 +520,38 @@
                   {{ verse.text }}
                 </div>
               </div>
+              <div v-else class="text-right space-y-3">
+                <div class="p-3 bg-brand-50/50 dark:bg-slate-800/50 rounded-xl border border-brand-100/50 dark:border-slate-700/50">
+                  <span class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">الجزء المشترك</span>
+                  <span class="quran-text text-xl leading-loose text-slate-800 dark:text-slate-100">{{ item.sharedText }}</span>
+                </div>
+                <div class="text-sm flex flex-col gap-2">
+                  <div>
+                    <span class="font-bold text-slate-700 dark:text-slate-300">إجابتك: </span>
+                    <span :class="item.isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'" class="font-bold">{{ item.userAnswerText }}</span>
+                  </div>
+                  <div v-if="!item.isCorrect">
+                    <span class="font-bold text-slate-700 dark:text-slate-300">الإجابة الصحيحة: </span>
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400">{{ item.correctAnswerText }}</span>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <div v-for="verse in item.matchingVerses" :key="'hist-match-'+verse.gid" class="bg-slate-100/50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/30 dark:border-slate-800/30">
+                    <span class="block text-xs font-bold text-brand-600 dark:text-brand-400 mb-1">{{ verse.ref }}</span>
+                    <span class="quran-text text-slate-700 dark:text-slate-300 leading-relaxed">"{{ verse.text }}"</span>
+                  </div>
+                </div>
+              </div>
 
               <!-- تفاصيل الإجابة والآية المشابهة للتوضيح -->
-              <div class="pt-3 border-t border-slate-200/50 dark:border-slate-800/50 text-sm flex flex-col gap-2">
+              <div v-if="item.type !== 'sharedPart'" class="pt-3 border-t border-slate-200/50 dark:border-slate-800/50 text-sm flex flex-col gap-2">
                 <div v-if="!item.isCorrect" class="flex gap-1.5 items-center">
                   <span class="font-bold text-slate-700 dark:text-slate-300">الإجابة الصحيحة:</span>
-                  <span class="quran-text font-bold text-emerald-600 dark:text-emerald-400">{{ item.correctAnswer }}</span>
+                  <span class="quran-text font-bold text-emerald-600 dark:text-emerald-400">{{ item.correctAnswerText }}</span>
+                </div>
+                <div class="flex gap-1.5 items-center text-xs text-slate-500 dark:text-slate-400">
+                  <span>تظهر التكملة الصحيحة في:</span>
+                  <span class="font-semibold">{{ item.correctOptionRefs.join('، ') }}</span>
                 </div>
                 <div class="mt-2 bg-slate-100/50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/30 dark:border-slate-800/30">
                   <span class="font-bold text-slate-600 dark:text-slate-400 block mb-1">الآية المشابهة المقابلة في سورة {{ item.comparisonSurah }} (آية {{ item.comparisonAya }}):</span>
@@ -440,6 +585,8 @@
   <!-- Main JavaScript App Loader -->
   <script src="data/similarities.js"></script>
   <script src="data/quran_text.js"></script>
+  <script src="data/page_juz_map.js"></script>
+  <script src="js/scope.js"></script>
   <script src="js/diffEngine.js"></script>
   <script src="js/app.js"></script>
   <script>
