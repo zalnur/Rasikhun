@@ -39,7 +39,7 @@ _Avoid_: the right text, matching string.
 ### Scoping
 
 **Selection** (المجال المختار):
-The region the target verse (Question's Location) is drawn from. Exactly one **mode** is active at a time — mutually exclusive: *All*, *Surahs* (one or more), *Juz* (exactly one), *Pages* (a contiguous range). Modes never combine.
+The region the target verse (Question's Location) is drawn from. Exactly one **mode** is active at a time — mutually exclusive: *All*, *Surahs* (one or more), *Juz* (one or more), *Pages* (a contiguous range). Modes never combine.
 _Avoid_: filter, scope (ambiguous), range (reserved for Pages).
 
 **Comparison Pool** (مصدر المُشتّتات):
