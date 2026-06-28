@@ -65,6 +65,19 @@ createApp({
       if (selectedJuz.value.length <= 4) return selectedJuz.value.map(n => `الجزء ${n}`).join('، ');
       return `${selectedJuz.value.length} أجزاء`;
     });
+    const selectionSummary = computed(() => {
+      if (selectionMode.value === 'surahs') {
+        if (selectedSurahs.value.length === 0) return 'كل القرآن';
+        if (selectedSurahs.value.length <= 3) return selectedSurahs.value.map(s => `سورة ${s}`).join('، ');
+        return `${selectedSurahs.value.length} سور`;
+      }
+      if (selectionMode.value === 'juz') return selectedJuzSummary.value;
+      if (selectionMode.value === 'pages') {
+        const f = Math.min(pageFrom.value, pageTo.value), t = Math.max(pageFrom.value, pageTo.value);
+        return `الصفحات ${f}–${t}`;
+      }
+      return 'كل القرآن';
+    });
 
     // كائن المجال المختار كما يفهمه Scope/Engine
     const buildSelection = () => {
@@ -242,7 +255,7 @@ createApp({
       isLoaded, currentScreen, darkMode,
       quizLength, quizType, mixedStrategy, questions, currentIndex, score, selectedAnswer, isAnswered, quizHistory,
       totalMutashabihat, totalVerses, totalPages, availableSurahs, currentQuestion,
-      allJuz, selectedJuzSummary,
+      allJuz, selectedJuzSummary, selectionSummary,
       showAdvancedSettings, quranTextFormat, gapMode, contextCountBefore, contextCountAfter,
       selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, distractorStrategy,
       starvedDialog,

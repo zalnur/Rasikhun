@@ -34,7 +34,7 @@ window.Scope = {
 
   /** وصف نصي للنطاق للرسائل وعرض الإعدادات. */
   describe(selection) {
-    if (!selection || selection.mode === 'all') return 'كل السور';
+    if (!selection || selection.mode === 'all') return 'كل القرآن';
     if (selection.mode === 'surahs') {
       const s = selection.surahs;
       if (s.length <= 3) return s.join('، ');
