@@ -25,7 +25,7 @@ What the user is tested on: a target Location is hidden (in full or in part) ins
 _Avoid_: prompt, item.
 
 **Shared-Part Question** (سؤال المواضع المشتركة):
-A Question that names a wording segment discovered from a Group, and asks which selected Locations contain that segment. Its Correct Answer is the full set of matching Locations in the active Selection, not just the Locations present in the source Group. The Comparison Pool may widen distractor/options, but never widens the Correct Answer.
+A Question that names a wording segment discovered either from a Group or by scanning repeated wording in the active Selection, and asks which selected Locations contain that segment. Its Correct Answer is the full set of matching Locations in the active Selection, not just the Locations present in any source Group. The Comparison Pool may widen distractor/options, but never widens the Correct Answer.
 _Avoid_: phrase quiz, count quiz.
 
 **Option** (خيار):
@@ -35,6 +35,10 @@ _Avoid_: choice, answer-button, distractor.
 **Correct Answer** (الموضع الصحيح):
 For a completion Question: the target Location. For a Shared-Part Question: the set of Locations that contain the named shared segment. Correctness is judged by Location identity, never by text equality.
 _Avoid_: the right text, matching string.
+
+**Candidate Quality** (جودة المرشح):
+How suitable a repeated wording segment is as a Shared-Part Question. A high-quality candidate is concise, distinctive, appears in a manageable number of Locations, often forms a repeated verse ending, and may be supported by the curated Groups.
+_Avoid_: difficulty score, truth score.
 
 ### Scoping
 

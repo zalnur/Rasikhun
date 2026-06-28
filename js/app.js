@@ -133,6 +133,11 @@ createApp({
       localStorage.setItem("theme", darkMode.value ? "dark" : "light");
     };
     const toggleDarkMode = () => { darkMode.value = !darkMode.value; applyTheme(); };
+    const fillToLength = (qs) => {
+      const out = [...qs];
+      while (out.length > 0 && out.length < quizLength.value) out.push(qs[(out.length - qs.length) % qs.length]);
+      return out.sort(() => Math.random() - 0.5);
+    };
 
     // توليد الأسئلة لمجموعات الهدف (مع تجاوز pool اختياري لملء النطاق المحدود)
     const generateAll = (overridePool) => {
@@ -158,6 +163,9 @@ createApp({
       const out = [];
       if (quizType.value === 'mixed') {
         return window.DiffEngine.generateMixedQuestions(targetGroups, similaritiesData.value, settings, quizLength.value);
+      }
+      if (quizType.value === 'sharedPart') {
+        window.DiffEngine.generateCorpusSharedPartQuestions(similaritiesData.value, settings, quizLength.value).forEach(q => out.push(q));
       }
       for (const g of targetGroups) {
         if (out.length >= quizLength.value) break;
@@ -196,9 +204,9 @@ createApp({
 
     const starvedRunPartial = () => { const p = starvedDialog.value.pending; starvedDialog.value = null; beginWith(p); };
     const starvedWidenPool = () => {
+      const p = starvedDialog.value.pending;
       starvedDialog.value = null;
-      const filled = generateAll('all'); // وسّع مصدر الخيارات لإكمال العدد
-      beginWith(filled.length ? filled : generateAll());
+      beginWith(fillToLength(p));
     };
 
     const selectAnswer = (option) => {

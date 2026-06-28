@@ -23,8 +23,59 @@ const DE = window.DiffEngine;
 let failures = 0;
 const assert = (cond, msg) => { if (!cond) { failures++; console.log('  ✗', msg); } };
 const sameLocations = (a, b) => a.length === b.length && a.every(g => b.includes(g));
+const sortNums = (xs) => [...new Set(xs)].sort((a, b) => a - b);
+const assertSameLocations = (actual, expected, msg) => {
+  const a = sortNums(actual || []);
+  const e = sortNums(expected || []);
+  assert(sameLocations(a, e), `${msg}: expected [${e.join(', ')}], got [${a.join(', ')}]`);
+};
+const withSeed = (seed, fn) => {
+  const oldRandom = Math.random;
+  let t = seed >>> 0;
+  Math.random = () => {
+    t += 0x6D2B79F5;
+    let r = t;
+    r = Math.imul(r ^ r >>> 15, r | 1);
+    r ^= r + Math.imul(r ^ r >>> 7, r | 61);
+    return ((r ^ r >>> 14) >>> 0) / 4294967296;
+  };
+  try { return fn(); } finally { Math.random = oldRandom; }
+};
+const textFor = (v, settings) =>
+  (settings.quranTextFormat === 'uthmani' && v.uthmani) ? v.uthmani : v.text;
+const corpusVerses = () => Object.entries(window.quranText).map(([gid, v]) => ({ ...v, gid: Number(gid) }));
+const corpusMatches = (sharedText, settings) => {
+  const key = DE._cleanText(sharedText);
+  return corpusVerses()
+    .filter(v => window.Scope.inSelection(v, settings.selection || { mode: 'all' }, map))
+    .filter(v => DE._cleanText(textFor(v, settings)).includes(key))
+    .map(v => v.gid);
+};
+const assertSharedQuestionMatchesCorpus = (q, settings, label) => {
+  const expected = corpusMatches(q.sharedText, settings);
+  assert(expected.length >= 2, `${label}: oracle found fewer than two corpus matches for "${q.sharedText}"`);
+  assertSameLocations(q.correctLocations, expected, `${label}: correct locations must equal the Quran corpus matches`);
+  assert(q.options.filter(o => sameLocations(sortNums(o.locations), sortNums(q.correctLocations))).length === 1, `${label}: expected exactly one correct option`);
+  q.options.flatMap(o => o.locations).forEach(g => {
+    const v = window.quranText[g] && { ...window.quranText[g], gid: g };
+    assert(!!v, `${label}: option location missing from Quran corpus: ${g}`);
+    assert(window.Scope.eligibleDistractor(v, settings.pool || 'all', settings.selection || { mode: 'all' }, map), `${label}: option leaked outside configured pool: ${g}`);
+  });
+};
+const assertCompletionQuestion = (q, settings, label) => {
+  assert(q.type === 'completion', `${label}: expected completion question`);
+  const target = window.quranText[q.targetGid] && { ...window.quranText[q.targetGid], gid: q.targetGid };
+  assert(!!target, `${label}: target missing from Quran corpus`);
+  assert(window.Scope.inSelection(target, settings.selection || { mode: 'all' }, map), `${label}: target leaked outside selection`);
+  assert(q.options.filter(o => o.locations.includes(q.correctAnswer)).length === 1, `${label}: expected exactly one correct option`);
+  q.options.flatMap(o => o.locations).forEach(g => {
+    const v = window.quranText[g] && { ...window.quranText[g], gid: g };
+    assert(!!v, `${label}: option location missing from Quran corpus: ${g}`);
+    assert(window.Scope.eligibleDistractor(v, settings.pool || 'all', settings.selection || { mode: 'all' }, map), `${label}: option leaked outside configured pool: ${g}`);
+  });
+};
 
-const gen = (n, settings) => {
+const gen = (n, settings, seed = 123456) => withSeed(seed, () => {
   const qs = [];
   for (let i = 0; i < n; i++) {
     const g = groups[Math.floor(Math.random() * groups.length)];
@@ -32,7 +83,7 @@ const gen = (n, settings) => {
     qs.push(q);
   }
   return qs.filter(Boolean);
-};
+});
 
 // === 1. Invariants الأساسية ===
 console.log('1) invariants (all, adaptive, cap 3, full gap)');
@@ -88,10 +139,7 @@ for (const g of groups) {
   const uniq = new Set(cleans);
   if (uniq.size < cleans.length) {
     foundIdentical = true;
-    const oldRandom = Math.random;
-    Math.random = () => 0;
-    const q = DE.generateQuestion(g, groups, { gapMode: 'full', selection: { mode: 'all' }, pool: 'all', optionCap: 3 });
-    Math.random = oldRandom;
+    const q = withSeed(14, () => DE.generateQuestion(g, groups, { gapMode: 'full', selection: { mode: 'all' }, pool: 'all', optionCap: 3 }));
     if (q) {
       const correctOpt = q.options.find(o => o.locations.includes(q.correctAnswer));
       assert(correctOpt && correctOpt.locations.length >= 2, 'identical-wording target should carry 2+ locations');
@@ -114,81 +162,83 @@ console.log(`   juz1-confined over random groups: ${nonNull} questions, ${nulls}
 
 // === 8. سؤال المواضع المشتركة ===
 console.log('8) shared-part question chooses a location set');
-const toyGroup = {
-  id: 'toy',
-  verses: [
-    { gid: 900001, sura_id: 1, aya_id: 1, sura_name: 'A', text: 'danny rode bike' },
-    { gid: 900002, sura_id: 1, aya_id: 2, sura_name: 'A', text: 'mark rode car' },
-    { gid: 900003, sura_id: 1, aya_id: 3, sura_name: 'A', text: 'dave ate chocolate' }
-  ]
+const sharedRealSettings = {
+  quranTextFormat: 'uthmani',
+  selection: { mode: 'all' },
+  pool: 'all',
+  optionMin: 3,
+  optionCap: 5
 };
-const oldQuranText = window.quranText;
-const oldPageJuzMap = window.pageJuzMap;
-window.quranText = {
-  900001: { sura_id: 1, aya_id: 1, sura_name: 'A', text: 'danny rode bike' },
-  900002: { sura_id: 1, aya_id: 2, sura_name: 'A', text: 'mark rode car' },
-  900003: { sura_id: 1, aya_id: 3, sura_name: 'A', text: 'dave ate chocolate' },
-  900004: { sura_id: 1, aya_id: 4, sura_name: 'A', text: 'sara rode bus' }
-};
-window.pageJuzMap = { byGid: {
-  900001: { juz: 1, page: 1 },
-  900002: { juz: 1, page: 1 },
-  900003: { juz: 1, page: 1 },
-  900004: { juz: 2, page: 22 }
-} };
-const sharedToy = DE.generateSharedPartQuestion(toyGroup, [toyGroup], { quranTextFormat: 'standard', selection: { mode: 'all' }, pool: 'all', optionCap: 3 });
-const sharedToyJuz1 = DE.generateSharedPartQuestion(toyGroup, [toyGroup], { quranTextFormat: 'standard', selection: { mode: 'juz', juz: 1 }, pool: 'all', optionCap: 3 });
-const oldRandomForNoisy = Math.random;
-Math.random = () => 0.99;
-const sharedToyNoisy = DE.generateSharedPartQuestion(toyGroup, [toyGroup], { quranTextFormat: 'standard', selection: { mode: 'juz', juz: 1 }, pool: 'confined', optionMin: 5, optionCap: 5 });
-Math.random = oldRandomForNoisy;
-window.quranText = oldQuranText;
-window.pageJuzMap = oldPageJuzMap;
-assert(sharedToy && sharedToy.sharedText === 'rode', 'toy shared phrase should be "rode"');
-assert(sharedToy && sameLocations(sharedToy.correctLocations, [900001, 900002, 900004]), 'toy correct locations should include corpus occurrence 900004');
-assert(sharedToy && sharedToy.options.filter(o => sameLocations(o.locations, sharedToy.correctLocations)).length === 1, 'shared question should have exactly one correct option');
-assert(sharedToyJuz1 && sameLocations(sharedToyJuz1.correctLocations, [900001, 900002]), 'shared question should honor selected juz for correct locations');
-assert(sharedToyNoisy && sharedToyNoisy.options.length === 5, 'shared question should support five noisy options when available');
-assert(sharedToyNoisy && sharedToyNoisy.options.some(o => !sameLocations(o.locations, sharedToyNoisy.correctLocations) && o.locations.length > 1), 'shared noisy options should include wrong multi-location sets');
-sharedToyNoisy && sharedToyNoisy.options.flatMap(o => o.locations).forEach(g => {
-  assert([900001, 900002, 900003].includes(g), `confined noisy option leaked outside juz 1: ${g}`);
-});
+const realSharedGroupIds = [1, 2, 5, 8, 10, 14, 20, 55, 89, 123, 200, 308];
+const realSharedQuestions = withSeed(20240628, () => realSharedGroupIds
+  .map(id => {
+    const group = groups.find(g => g.id === id);
+    return group && DE.generateSharedPartQuestion(group, groups, sharedRealSettings);
+  })
+  .filter(Boolean));
+assert(realSharedQuestions.length === realSharedGroupIds.length, 'real shared sample should generate from every selected real group');
+realSharedQuestions.forEach(q => assertSharedQuestionMatchesCorpus(q, sharedRealSettings, `real shared group ${q.id}`));
 
-let sharedReal = null;
-for (const g of groups) {
-  sharedReal = DE.generateSharedPartQuestion(g, groups, { selection: { mode: 'all' }, pool: 'all', optionCap: 3 });
-  if (sharedReal) break;
-}
-assert(!!sharedReal, 'should generate at least one shared-part question from real data');
-if (sharedReal) {
-  assert(sharedReal.correctLocations.length >= 2, 'real shared question needs 2+ correct locations');
-  assert(sharedReal.options.length >= 2 && sharedReal.options.length <= 3, 'real shared question option count');
-}
+const baqarah68Group = groups.find(g => g.id === 308);
+const baqarah68SourceGids = baqarah68Group.verses.map(v => v.gid);
+const baqarah68Question = realSharedQuestions.find(q => q.id === 308);
+assert(!!baqarah68Question, 'Baqarah 68/69 source group should produce a real shared question');
+assert(baqarah68Question.correctLocations.some(g => !baqarah68SourceGids.includes(g)), 'Baqarah 68/69 source group should include matching Quran occurrences not present in the curated group');
+
+const corpusJuz1Settings = {
+  quranTextFormat: 'uthmani',
+  selection: { mode: 'juz', juz: 1 },
+  pool: 'confined',
+  optionMin: 3,
+  optionCap: 5
+};
+const corpusJuz1 = withSeed(9001, () => DE.generateCorpusSharedPartQuestions(groups, corpusJuz1Settings, 1000));
+const laallakum = corpusJuz1.find(q => sameLocations(q.correctLocations, [28, 70]));
+assert(!!laallakum, 'corpus shared questions should include Baqarah 21/63: لَعَلَّكُمۡ تَتَّقُونَ');
+const baqarahCow = corpusJuz1.find(q => sameLocations(q.correctLocations, [75, 76, 78]));
+assert(!!baqarahCow, 'corpus shared questions should include Baqarah 68/69/71, including verse 71');
+assert(corpusJuz1.length > 6, 'corpus shared questions should not be capped by source similarity groups in juz 1');
+const rankedJuz1 = withSeed(0, () => DE.generateCorpusSharedPartQuestions(groups, corpusJuz1Settings, 10));
+assert(rankedJuz1.some(q => sameLocations(q.correctLocations, [28, 70])), 'candidate quality should rank Baqarah 21/63 into a short juz 1 quiz');
+corpusJuz1.slice(0, 40).forEach((q, i) => {
+  assertSharedQuestionMatchesCorpus(q, corpusJuz1Settings, `corpus juz 1 shared question ${i + 1}`);
+  assert(q.options.length >= 3 && q.options.length <= 5, `corpus shared question option count should be within [3,5], got ${q.options.length}`);
+  q.options.flatMap(o => o.locations).forEach(g => assert(map[g].juz === 1, `corpus confined option leaked outside juz 1: ${g}`));
+});
+assert(corpusJuz1.some(q => q.options.some(o => !sameLocations(sortNums(o.locations), sortNums(q.correctLocations)) && o.locations.length > 1)), 'corpus shared questions should include confusing multi-location wrong answers');
 
 // === 9. الاختبار المختلط ===
 console.log('9) mixed quiz generation');
-const mixedBalanced = DE.generateMixedQuestions([toyGroup], [toyGroup], {
-  quranTextFormat: 'standard',
-  selection: { mode: 'all' },
-  pool: 'all',
-  optionCap: 3,
+const targetJuz1Groups = groups.filter(g => g.verses && g.verses.some(v => window.Scope.inSelection(v, { mode: 'juz', juz: 1 }, map)));
+const mixedJuz1Settings = {
+  quranTextFormat: 'uthmani',
+  selection: { mode: 'juz', juz: 1 },
+  pool: 'confined',
+  optionMin: 3,
+  optionCap: 5,
   mixedStrategy: 'balanced'
-}, 2);
-assert(mixedBalanced.length === 2, 'balanced mixed should fill requested count when both types exist');
-assert(mixedBalanced.some(q => q.type === 'completion'), 'balanced mixed should include a completion question');
-assert(mixedBalanced.some(q => q.type === 'sharedPart'), 'balanced mixed should include a shared-part question');
+};
+const mixedJuz1 = withSeed(606, () => DE.generateMixedQuestions(targetJuz1Groups, groups, mixedJuz1Settings, 10));
+assert(mixedJuz1.length === 10, 'mixed juz 1 should fill the requested count with corpus shared candidates');
+assert(mixedJuz1.some(q => q.type === 'completion'), 'mixed juz 1 should include completion questions');
+assert(mixedJuz1.some(q => q.type === 'sharedPart'), 'mixed juz 1 should include shared-part questions');
+mixedJuz1.forEach(q => {
+  if (q.type === 'sharedPart') assertSharedQuestionMatchesCorpus(q, mixedJuz1Settings, `mixed shared ${q.id}`);
+  else assertCompletionQuestion(q, mixedJuz1Settings, `mixed completion ${q.id}`);
+});
 
-const oldRandomForMixed = Math.random;
-Math.random = () => 0.99;
-const mixedRandom = DE.generateMixedQuestions([toyGroup], [toyGroup], {
-  quranTextFormat: 'standard',
-  selection: { mode: 'all' },
-  pool: 'all',
-  optionCap: 3,
+const mixedRandomSettings = {
+  ...mixedJuz1Settings,
   mixedStrategy: 'random'
-}, 2);
-Math.random = oldRandomForMixed;
-assert(mixedRandom.length === 2, 'random mixed should fall back to the other type when needed');
+};
+const mixedRandom = withSeed(707, () => DE.generateMixedQuestions(targetJuz1Groups, groups, mixedRandomSettings, 10));
+assert(mixedRandom.length === 10, 'random mixed should fill the requested count from real Juz 1 data');
+assert(mixedRandom.some(q => q.type === 'completion'), 'random mixed should include completion questions from real data');
+assert(mixedRandom.some(q => q.type === 'sharedPart'), 'random mixed should include shared-part questions from real data');
+mixedRandom.forEach(q => {
+  if (q.type === 'sharedPart') assertSharedQuestionMatchesCorpus(q, mixedRandomSettings, `random mixed shared ${q.id}`);
+  else assertCompletionQuestion(q, mixedRandomSettings, `random mixed completion ${q.id}`);
+});
 
 console.log('\n' + (failures === 0 ? '✅ ALL CHECKS PASSED' : `❌ ${failures} FAILURE(S)`));
 process.exit(failures === 0 ? 0 : 1);
