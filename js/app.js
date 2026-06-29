@@ -159,7 +159,7 @@ createApp({
 
     let sharedPartWarmTimer = null;
     const scheduleSharedPartWarm = () => {
-      if (!isLoaded.value || quizType.value === 'completion' || !window.SharedPartIndex) return;
+      if (!isLoaded.value || !window.SharedPartIndex) return;
       if (sharedPartWarmTimer) {
         if (sharedPartWarmTimer.type === 'idle' && window.cancelIdleCallback) cancelIdleCallback(sharedPartWarmTimer.id);
         else clearTimeout(sharedPartWarmTimer.id);
@@ -175,7 +175,7 @@ createApp({
         sharedPartWarmTimer = { type: 'timeout', id: setTimeout(run, 0) };
       }
     };
-    watch([quizType, quranTextFormat, selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, quizLength], scheduleSharedPartWarm, { deep: true });
+    watch([quranTextFormat, selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, quizLength], scheduleSharedPartWarm, { deep: true });
 
     // توليد الأسئلة لمجموعات الهدف (مع تجاوز pool اختياري لملء النطاق المحدود)
     const generateAll = (overridePool) => {

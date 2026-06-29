@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review - mutashabeh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      body { background: #fafaf9; }
+      .seam-line { border-top: 2px dashed #94a3b8; }
+      .deep-box { background: linear-gradient(135deg, #0f172a, #1e293b); color: white; }
+      .leak-arrow { color: #dc2626; }
+      .surface { background: #e0f2fe; border-color: #0284c7; }
+      .impl { background: #f8fafc; border-color: #cbd5e1; }
+      .thin { height: 2.1rem; }
+      .thick { height: 7.5rem; }
+      .diagram-label { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+      .box { border: 1px solid #cbd5e1; border-radius: 0.5rem; background: white; padding: 0.75rem; }
+      .faded { opacity: 0.45; }
+    </style>
+  </head>
+  <body class="text-slate-900 font-sans">
+    <main class="max-w-6xl mx-auto px-6 py-12 space-y-12">
+      <header class="space-y-5">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-500">Architecture review</p>
+            <h1 class="text-4xl font-semibold text-slate-950">mutashabeh</h1>
+          </div>
+          <p class="text-sm text-slate-500">2026-06-29</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-4 text-sm">
+          <div class="box"><span class="font-semibold">Solid box</span><br />module</div>
+          <div class="box"><span class="font-semibold">Dashed line</span><br />seam</div>
+          <div class="box"><span class="font-semibold text-red-600">Red arrow</span><br />leakage</div>
+          <div class="box deep-box"><span class="font-semibold">Dark box</span><br />deep module</div>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+        <article id="candidate-shared-part" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-2xl font-semibold text-slate-950">Deepen the Shared-Part Question module</h2>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">Strong</span>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">in-process</span>
+                <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">failing perf check</span>
+              </div>
+            </div>
+            <a href="#top-recommendation" class="text-sm font-semibold text-slate-500 hover:text-slate-900">top pick</a>
+          </div>
+
+          <div>
+            <p class="diagram-label mb-2">Files</p>
+            <div class="font-mono text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              js/diffEngine.js<br />
+              js/sharedPartIndex.js<br />
+              tests/test_engine.js<br />
+              tests/test_perf.js<br />
+              docs/adr/0002-corpus-derived-shared-part-candidates.md<br />
+              docs/adr/0003-index-backed-shared-part-generation.md
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="diagram-label mb-3">Before</p>
+              <div class="rounded-lg bg-white p-3">
+                <pre class="mermaid">
+flowchart TB
+  A[DiffEngine module] --> B[_getSharedPartIndex]
+  B --> C[SharedPartIndex module]
+  C -. private helper leakage .-> D[DiffEngine scoring helpers]
+  C -. private helper leakage .-> E[DiffEngine question builder]
+  A --> F[old corpus fallback]
+  F -. duplicate candidate work .-> G[phrase scan and scoring]
+  H[tests] --> A
+  H --> C
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class C,D,E,F,G leak;
+                </pre>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="diagram-label mb-3">After</p>
+              <div class="relative h-80 rounded-lg bg-white p-5">
+                <div class="absolute inset-x-5 top-5 rounded-lg border-2 border-slate-900 deep-box p-4">
+                  <p class="diagram-label text-slate-300">Deep module</p>
+                  <p class="text-lg font-semibold">Shared-Part Question</p>
+                  <div class="mt-4 grid grid-cols-3 gap-2 text-xs text-slate-200">
+                    <div class="rounded border border-slate-500 p-2">index</div>
+                    <div class="rounded border border-slate-500 p-2">Candidate Quality</div>
+                    <div class="rounded border border-slate-500 p-2">Question build</div>
+                    <div class="rounded border border-slate-500 p-2">Selection match</div>
+                    <div class="rounded border border-slate-500 p-2">Comparison Pool</div>
+                    <div class="rounded border border-slate-500 p-2">warm bank</div>
+                  </div>
+                </div>
+                <div class="absolute left-10 right-10 bottom-20 seam-line"></div>
+                <div class="absolute bottom-5 left-5 right-5 grid grid-cols-2 gap-3 text-sm">
+                  <div class="box text-center">DiffEngine callers</div>
+                  <div class="box text-center">tests hit one seam</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <div>
+              <p class="diagram-label mb-1">Problem</p>
+              <p class="text-sm text-slate-700">Shared-Part indexing, Candidate Quality, Correct Answer construction, and warm bank behavior are split across two modules with private helper leakage.</p>
+            </div>
+            <div>
+              <p class="diagram-label mb-1">Solution</p>
+              <p class="text-sm text-slate-700">Put Shared-Part discovery, scoring, and Question construction behind one deep module; DiffEngine only asks for Questions.</p>
+            </div>
+            <div>
+              <p class="diagram-label mb-1">Benefits</p>
+              <ul class="text-sm text-slate-700 space-y-1">
+                <li>locality: cold perf bug concentrates</li>
+                <li>leverage: one Shared-Part seam</li>
+                <li>tests hit one interface</li>
+                <li>delete old fallback work</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article id="candidate-selection" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-2xl font-semibold text-slate-950">Deepen the Selection module</h2>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Worth exploring</span>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">in-process</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p class="diagram-label mb-2">Files</p>
+            <div class="font-mono text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              js/scope.js<br />
+              js/app.js<br />
+              js/sharedPartIndex.js<br />
+              js/diffEngine.js<br />
+              tests/test_engine.js<br />
+              tests/test_perf.js
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="diagram-label mb-3">Before</p>
+              <div class="grid gap-2">
+                <div class="box">app.js builds Selection</div>
+                <div class="box">scope.js answers inSelection and eligibleDistractor</div>
+                <div class="box">sharedPartIndex.js owns selectionKey and caches</div>
+                <div class="box">diffEngine.js filters target Groups and Options</div>
+                <div class="box">tests repeat Selection oracle rules</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="diagram-label mb-3">After</p>
+              <div class="relative h-80 rounded-lg bg-white p-5">
+                <div class="mx-auto max-w-md rounded-lg border-2 border-slate-900 deep-box p-4 text-center">
+                  <p class="diagram-label text-slate-300">Deep module</p>
+                  <p class="text-lg font-semibold">Selection</p>
+                  <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-200">
+                    <div class="rounded border border-slate-500 p-2">membership</div>
+                    <div class="rounded border border-slate-500 p-2">cache key</div>
+                    <div class="rounded border border-slate-500 p-2">target Groups</div>
+                    <div class="rounded border border-slate-500 p-2">pool gids</div>
+                  </div>
+                </div>
+                <div class="mt-8 seam-line"></div>
+                <div class="mt-8 grid grid-cols-3 gap-3 text-sm">
+                  <div class="box text-center">app</div>
+                  <div class="box text-center">DiffEngine</div>
+                  <div class="box text-center">tests</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <div>
+              <p class="diagram-label mb-1">Problem</p>
+              <p class="text-sm text-slate-700">The Selection interface is small, but its implementation is scattered: membership, cache identity, target Group filtering, and Comparison Pool lists live in different modules.</p>
+            </div>
+            <div>
+              <p class="diagram-label mb-1">Solution</p>
+              <p class="text-sm text-slate-700">Let the Selection module own Selection identity and derived Location lists; callers stop rebuilding the same facts.</p>
+            </div>
+            <div>
+              <p class="diagram-label mb-1">Benefits</p>
+              <ul class="text-sm text-slate-700 space-y-1">
+                <li>locality: one Selection rule</li>
+                <li>leverage: shared cache keys</li>
+                <li>fewer drift points</li>
+                <li>tests use public seam</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article id="candidate-quiz-run" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-2xl font-semibold text-slate-950">Collapse quiz run orchestration</h2>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span class="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">Speculative</span>
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">mock</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <p class="diagram-label mb-2">Files</p>
+            <div class="font-mono text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              js/app.js<br />
+              index.html<br />
+              js/diffEngine.js
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="diagram-label mb-3">Before</p>
+              <div class="rounded-lg bg-white p-5">
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div class="box">Vue state</div>
+                  <div class="box">settings build</div>
+                  <div class="box">Question generation</div>
+                  <div class="box">starved Selection dialog</div>
+                  <div class="box">score history</div>
+                  <div class="box">answer checking</div>
+                </div>
+                <p class="mt-4 text-center text-sm text-red-600">wide interface across UI event handlers</p>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="diagram-label mb-3">After</p>
+              <div class="rounded-lg bg-white p-5">
+                <div class="mx-auto max-w-sm rounded-lg border-2 border-slate-900 deep-box p-4 text-center">
+                  <p class="diagram-label text-slate-300">Deep module</p>
+                  <p class="text-lg font-semibold">Quiz Run</p>
+                  <div class="mt-4 space-y-2 text-xs text-slate-200">
+                    <div class="rounded border border-slate-500 p-2">start</div>
+                    <div class="rounded border border-slate-500 p-2">answer</div>
+                    <div class="rounded border border-slate-500 p-2">next</div>
+                    <div class="rounded border border-slate-500 p-2">finish</div>
+                  </div>
+                </div>
+                <div class="mt-8 seam-line"></div>
+                <div class="mt-8 box text-center">Vue renders run state</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <div>
+              <p class="diagram-label mb-1">Problem</p>
+              <p class="text-sm text-slate-700">app.js mixes render state, Question generation, starvation policy, answer checking, and history recording in one shallow module.</p>
+            </div>
+            <div>
+              <p class="diagram-label mb-1">Solution</p>
+              <p class="text-sm text-slate-700">Only if UI bugs appear: move quiz run rules behind a small module and leave Vue as the adapter.</p>
+            </div>
+            <div>
+              <p class="diagram-label mb-1">Benefits</p>
+              <ul class="text-sm text-slate-700 space-y-1">
+                <li>locality: run bugs concentrate</li>
+                <li>leverage: UI tests shrink</li>
+                <li>answer rules testable</li>
+                <li>delete event-handler logic</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="top-recommendation" class="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-6">
+        <p class="text-xs uppercase tracking-wider text-emerald-800">Top recommendation</p>
+        <h2 class="mt-2 text-2xl font-semibold text-emerald-950">Deepen the Shared-Part Question module</h2>
+        <p class="mt-3 max-w-3xl text-sm text-emerald-950">
+          Tackle this first because the current failing check is in cold Shared-Part preparation, and this deepening gives the bug one module, one seam, and one test surface.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

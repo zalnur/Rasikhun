@@ -4,8 +4,15 @@
 (function () {
   const DEFAULT_SELECTION = { mode: 'all' };
 
-  const cleanText = (text) => window.DiffEngine._cleanText(text || "");
-  const plainWord = (word) => window.DiffEngine._plainWord(word || "");
+  const cleanText = (text) => (text || "").replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").trim();
+  const plainFromClean = (word) => word
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
+    .replace(/[إأٱآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/[ؤ]/g, "و")
+    .replace(/[ئ]/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[^\u0621-\u064A]/g, "");
   const formatText = (v, format) => (format === 'uthmani' && v.uthmani) ? v.uthmani : v.text;
   const sortedNums = (xs) => Array.from(new Set(xs)).sort((a, b) => a - b);
   const shuffle = (arr) => {
@@ -16,15 +23,15 @@
     }
     return out;
   };
-  const plainWordCache = new Map();
-  const cleanWordCache = new Map();
-  const cachedPlainWord = (word) => {
-    if (!plainWordCache.has(word)) plainWordCache.set(word, plainWord(word));
-    return plainWordCache.get(word);
-  };
-  const cachedCleanWord = (word) => {
-    if (!cleanWordCache.has(word)) cleanWordCache.set(word, cleanText(word));
-    return cleanWordCache.get(word);
+  const wordInfoCache = new Map();
+  const cachedWordInfo = (word) => {
+    let value = wordInfoCache.get(word);
+    if (value === undefined) {
+      const clean = cleanText(word);
+      value = [clean, plainFromClean(clean)];
+      wordInfoCache.set(word, value);
+    }
+    return value;
   };
 
   const selectionKey = (selection) => {
@@ -36,6 +43,29 @@
     }
     if (selection.mode === 'pages') return `pages:${selection.pageFrom}-${selection.pageTo}`;
     return 'all';
+  };
+
+  const optionLimit = (settings) => {
+    const max = Math.max(2, settings.optionCap || 3);
+    const min = Math.max(2, Math.min(max, settings.optionMin || max));
+    return min + Math.floor(Math.random() * (max - min + 1));
+  };
+
+  const stopWords = new Set([
+    "و", "ف", "ثم", "او", "ام", "بل", "لا", "ما", "من", "في", "عن", "علي", "الى",
+    "ان", "انما", "قد", "لقد", "كل", "هذا", "هذه", "ذلك", "تلك", "هو", "هي", "هم",
+    "الذي", "الذين", "التي", "يا", "ايها"
+  ]);
+
+  const groupPairSet = (groups) => {
+    const pairs = new Set();
+    (groups || []).forEach(g => {
+      const gids = (g.verses || []).map(v => v.gid).filter(Boolean);
+      for (let i = 0; i < gids.length; i++) {
+        for (let j = i + 1; j < gids.length; j++) pairs.add([gids[i], gids[j]].sort((a, b) => a - b).join(':'));
+      }
+    });
+    return pairs;
   };
 
   const stripCliticForms = (plain) => {
@@ -50,8 +80,12 @@
 
   function addToSetMap(map, key, value) {
     if (!key) return;
-    if (!map.has(key)) map.set(key, new Set());
-    map.get(key).add(value);
+    let set = map.get(key);
+    if (!set) {
+      set = new Set();
+      map.set(key, set);
+    }
+    set.add(value);
   }
 
   function createIndex({ groups, quranText, pageJuzMap }) {
@@ -90,8 +124,13 @@
 
       verses.forEach(v => {
         const words = v.text.split(/\s+/).filter(Boolean);
-        const plainWords = words.map(cachedPlainWord);
-        const cleanWords = words.map(cachedCleanWord);
+        const plainWords = new Array(words.length);
+        const cleanWords = new Array(words.length);
+        for (let i = 0; i < words.length; i++) {
+          const info = cachedWordInfo(words[i]);
+          cleanWords[i] = info[0];
+          plainWords[i] = info[1];
+        }
         const versePlainWords = new Set();
         plainWords.forEach(plain => {
           stripCliticForms(plain).forEach(w => {
@@ -113,30 +152,34 @@
             const phraseKey = key.trim();
             if (!phraseKey || seen.has(phraseKey)) continue;
             seen.add(phraseKey);
-            if (!phraseMap.has(phraseKey)) phraseMap.set(phraseKey, { key: phraseKey, text, wordCount: len, exactGids: [] });
-            const p = phraseMap.get(phraseKey);
+            let p = phraseMap.get(phraseKey);
+            if (!p) {
+              p = { key: phraseKey, text, wordCount: len, exactGids: [] };
+              phraseMap.set(phraseKey, p);
+            }
             p.exactGids.push(v.gid);
           }
         }
       });
 
+      const plainWordToGidsList = new Map(Array.from(plainWordToGids, ([key, set]) => [key, Array.from(set)]));
       const repeatedPhrases = Array.from(phraseMap.values())
         .filter(p => p.exactGids.length >= 2)
-        .map(p => ({ ...p, plainWords: Array.from(new Set(p.text.split(/\s+/).map(cachedPlainWord).filter(w => w.length > 1))) }));
-      const idx = { corpusByGid, verses, cleanByGid, plainWordToGids, repeatedPhrases };
+        .map(p => ({ ...p, plainWords: Array.from(new Set(p.text.split(/\s+/).map(w => cachedWordInfo(w)[1]).filter(w => w.length > 1))) }));
+      const idx = { corpusByGid, verses, cleanByGid, plainWordToGids: plainWordToGidsList, repeatedPhrases };
       formatCache.set(format, idx);
       return idx;
     };
 
     const getGroupPairs = () => {
-      if (!groupPairs) groupPairs = window.DiffEngine._groupPairSet(groups || []);
+      if (!groupPairs) groupPairs = groupPairSet(groups || []);
       return groupPairs;
     };
 
     const contentWordCountCache = new Map();
     const contentWordCount = (text) => {
       if (!contentWordCountCache.has(text)) {
-        contentWordCountCache.set(text, window.DiffEngine._contentWordCount(text));
+        contentWordCountCache.set(text, text.split(/\s+/).map(w => cachedWordInfo(w)[1]).filter(w => w.length > 1 && !stopWords.has(w)).length);
       }
       return contentWordCountCache.get(text);
     };
@@ -207,13 +250,13 @@
       phrase.plainWords.forEach(w => {
         const gids = idx.plainWordToGids.get(w);
         if (!gids) return;
-        if (gids.size < sourceSize) {
+        if (gids.length < sourceSize) {
           sourceSet = gids;
-          sourceSize = gids.size;
+          sourceSize = gids.length;
         }
       });
 
-      const source = sourceSet ? Array.from(sourceSet) : selected.list;
+      const source = sourceSet || selected.list;
       const allSelected = selected.list.length === idx.verses.length;
       const matched = allSelected
         ? source.filter(gid => idx.cleanByGid.get(gid).includes(phrase.key))
@@ -260,10 +303,81 @@
       return out;
     };
 
+    const buildSharedPartQuestion = (id, sharedText, correctLocations, corpusByGid, settings) => {
+      const sample = (arr, count) => {
+        if (count >= arr.length) return shuffle(arr);
+        const out = [];
+        const used = new Set();
+        while (out.length < count && used.size < arr.length) {
+          const idx = Math.floor(Math.random() * arr.length);
+          if (used.has(idx)) continue;
+          used.add(idx);
+          out.push(arr[idx]);
+        }
+        return out;
+      };
+      const refOf = (v) => v.sura_name + " " + v.aya_id;
+      const sameSet = (a, b) => a.length === b.length && a.every(g => b.includes(g));
+      const byGid = (corpusByGid && typeof corpusByGid.get === 'function' && typeof corpusByGid.has === 'function')
+        ? corpusByGid
+        : new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
+      const optionFrom = (locations) => {
+        const ordered = Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
+        const refs = ordered.map(g => refOf(byGid.get(g)));
+        return { text: refs.join(" • "), locations: ordered, refs: refs };
+      };
+
+      correctLocations = Array.from(new Set(correctLocations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
+      if (correctLocations.length < 2) return null;
+
+      const wrongSets = [];
+      const addWrong = (locations) => {
+        const ordered = optionFrom(locations).locations;
+        if (!ordered.length || sameSet(ordered, correctLocations) || wrongSets.some(s => sameSet(s, ordered))) return;
+        wrongSets.push(ordered);
+      };
+
+      const limit = optionLimit(settings);
+      const fakePoolGids = settings._poolGids || poolGids(settings);
+      const outsiders = fakePoolGids.filter(g => !correctLocations.includes(g));
+
+      correctLocations.forEach((gid, idx) => sample(outsiders, 8).forEach(g => addWrong(correctLocations.map((x, i) => i === idx ? g : x))));
+      sample(outsiders, 8).forEach(g => addWrong([...correctLocations, g]));
+      correctLocations.forEach(g => addWrong([g]));
+      sample(fakePoolGids, 12).forEach(g => addWrong([g]));
+
+      for (let i = 0; i < 80 && wrongSets.length < limit * 4; i++) {
+        const maxSize = Math.min(fakePoolGids.length, Math.max(2, correctLocations.length + 2));
+        const minSize = Math.min(maxSize, correctLocations.length > 1 ? 2 : 1);
+        const size = minSize + Math.floor(Math.random() * (maxSize - minSize + 1));
+        addWrong(sample(fakePoolGids, size));
+      }
+
+      const options = shuffle([
+        optionFrom(correctLocations),
+        ...shuffle(wrongSets).slice(0, limit - 1).map(optionFrom)
+      ]);
+      if (options.length < 2) return null;
+
+      return {
+        id: id,
+        type: 'sharedPart',
+        sharedText: sharedText,
+        correctAnswer: correctLocations[0],
+        correctLocations: correctLocations,
+        options: options,
+        matchingVerses: correctLocations.map(g => byGid.get(g)).map(v => ({
+          gid: v.gid,
+          ref: refOf(v),
+          text: v.text
+        }))
+      };
+    };
+
     const buildQuestion = (candidate, settings) => {
       const format = settings.quranTextFormat || 'uthmani';
       const idx = formatIndex(format);
-      const q = window.DiffEngine._buildSharedPartQuestion(
+      const q = buildSharedPartQuestion(
         candidate.id,
         candidate.sharedText,
         candidate.correctLocations,
@@ -272,6 +386,58 @@
       );
       if (q) q._score = candidate.score;
       return q;
+    };
+
+    const buildGroupQuestion = (group, settings = {}) => {
+      settings = Object.assign({
+        quranTextFormat: 'uthmani', selection: DEFAULT_SELECTION, pool: 'all', optionCap: 3
+      }, settings);
+
+      if (!group || !group.verses || group.verses.length < 2) return null;
+
+      const format = settings.quranTextFormat || 'uthmani';
+      const idx = formatIndex(format);
+      const inSelection = (v) => window.Scope.inSelection(v, settings.selection, map);
+      const eligibleForPool = (v) => window.Scope.eligibleDistractor(v, settings.pool, settings.selection, map);
+      const formattedGroupVerses = group.verses.map(v => {
+        const corpusVerse = idx.corpusByGid.get(v.gid);
+        return { ...v, text: corpusVerse ? corpusVerse.text : formatText(v, format) };
+      });
+      const verses = formattedGroupVerses.filter(v => inSelection(v) || eligibleForPool(v));
+      if (verses.length < 2 || !verses.some(inSelection)) return null;
+
+      const phrases = new Map();
+      verses.forEach(v => {
+        const words = v.text.split(/\s+/).filter(Boolean);
+        const seen = new Set();
+        for (let len = Math.min(5, words.length); len >= 1; len--) {
+          for (let i = 0; i <= words.length - len; i++) {
+            const text = words.slice(i, i + len).join(" ");
+            const key = cleanText(text);
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            if (!phrases.has(key)) phrases.set(key, { text, wordCount: len, gids: new Set(), verses: [] });
+            const p = phrases.get(key);
+            p.gids.add(v.gid);
+            p.verses.push(v);
+          }
+        }
+      });
+
+      const candidates = Array.from(phrases.values())
+        .filter(p => p.gids.size >= 2 && p.verses.some(inSelection));
+      if (candidates.length === 0) return null;
+
+      const notAll = candidates.filter(p => p.gids.size < verses.length);
+      const picked = (notAll.length ? notAll : candidates)
+        .map(p => ({ p, r: Math.random() }))
+        .sort((a, b) => b.p.wordCount - a.p.wordCount || a.p.gids.size - b.p.gids.size || a.r - b.r)[0].p;
+
+      const matchKey = cleanText(picked.text);
+      const correctLocations = Array.from(idx.corpusByGid.values())
+        .filter(v => inSelection(v) && cleanText(v.text).includes(matchKey))
+        .map(v => v.gid);
+      return buildSharedPartQuestion(group.id, picked.text, correctLocations, idx.corpusByGid, { ...settings, _poolGids: poolGids(settings) });
     };
 
     const questionBankKey = (settings) => [
@@ -287,7 +453,7 @@
       if (!questionBankCache.has(key)) questionBankCache.set(key, { questions: [], next: 0 });
       const bank = questionBankCache.get(key);
       const candidates = sharedCandidates(settings);
-      const target = Math.min(candidates.length, Math.max(needed || 0, 120));
+      const target = Math.min(candidates.length, Math.max(needed || 0, bank.questions.length));
       while (bank.questions.length < target && bank.next < candidates.length) {
         const q = buildQuestion(candidates[bank.next++], settings);
         if (q) bank.questions.push(q);
@@ -315,6 +481,7 @@
       poolGids,
       sharedCandidates,
       buildQuestion,
+      buildGroupQuestion,
       questionBank,
       sampleQuestions,
       warm(settings) {

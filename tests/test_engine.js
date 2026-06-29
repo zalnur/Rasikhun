@@ -170,6 +170,24 @@ const sharedRealSettings = {
   optionMin: 3,
   optionCap: 5
 };
+const directSharedIndex = window.SharedPartIndex.create({
+  groups,
+  quranText: window.quranText,
+  pageJuzMap: window.pageJuzMap
+});
+const baqarah68Group = groups.find(g => g.id === 308);
+const directBaqarah68Question = withSeed(20240629, () => directSharedIndex.buildGroupQuestion(baqarah68Group, sharedRealSettings));
+assert(!!directBaqarah68Question, 'SharedPartIndex should build a group-backed shared question directly');
+assertSharedQuestionMatchesCorpus(directBaqarah68Question, sharedRealSettings, 'direct SharedPartIndex group 308');
+
+const savedSharedPartIndex = window.SharedPartIndex;
+window.SharedPartIndex = null;
+DE._sharedPartIndexCache = null;
+assert(DE.generateCorpusSharedPartQuestions(groups, sharedRealSettings, 3).length === 0, 'missing SharedPartIndex should fail safe for corpus shared questions');
+assert(DE.generateSharedPartQuestion(baqarah68Group, groups, sharedRealSettings) === null, 'missing SharedPartIndex should fail safe for group shared questions');
+window.SharedPartIndex = savedSharedPartIndex;
+DE._sharedPartIndexCache = null;
+
 const realSharedGroupIds = [1, 2, 5, 8, 10, 14, 20, 55, 89, 123, 200, 308];
 const realSharedQuestions = withSeed(20240628, () => realSharedGroupIds
   .map(id => {
@@ -180,7 +198,6 @@ const realSharedQuestions = withSeed(20240628, () => realSharedGroupIds
 assert(realSharedQuestions.length === realSharedGroupIds.length, 'real shared sample should generate from every selected real group');
 realSharedQuestions.forEach(q => assertSharedQuestionMatchesCorpus(q, sharedRealSettings, `real shared group ${q.id}`));
 
-const baqarah68Group = groups.find(g => g.id === 308);
 const baqarah68SourceGids = baqarah68Group.verses.map(v => v.gid);
 const baqarah68Question = realSharedQuestions.find(q => q.id === 308);
 assert(!!baqarah68Question, 'Baqarah 68/69 source group should produce a real shared question');
