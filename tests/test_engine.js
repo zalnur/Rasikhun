@@ -16,6 +16,7 @@ load('data/quran_text.js');
 load('data/page_juz_map.js');
 load('js/scope.js');
 load('js/diffEngine.js');
+load('js/sharedPartIndex.js');
 const groups = JSON.parse(fs.readFileSync(path.join(root, 'data/similarities.json'), 'utf8'));
 
 const map = window.pageJuzMap.byGid;
