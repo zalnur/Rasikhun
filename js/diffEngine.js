@@ -26,6 +26,26 @@ window.DiffEngine = {
     return corpusByGid;
   },
 
+  _getSharedPartIndex: function (allGroups) {
+    if (!window.SharedPartIndex) return null;
+    if (!this._sharedPartIndexCache ||
+      this._sharedPartIndexCache.groups !== allGroups ||
+      this._sharedPartIndexCache.quranText !== window.quranText ||
+      this._sharedPartIndexCache.pageJuzMap !== window.pageJuzMap) {
+      this._sharedPartIndexCache = {
+        groups: allGroups,
+        quranText: window.quranText,
+        pageJuzMap: window.pageJuzMap,
+        index: window.SharedPartIndex.create({
+          groups: allGroups,
+          quranText: window.quranText,
+          pageJuzMap: window.pageJuzMap
+        })
+      };
+    }
+    return this._sharedPartIndexCache.index;
+  },
+
   /**
    * مقارنة آيتين واستخراج الجزء المختلف مع سياق بسيط حوله
    */
@@ -127,10 +147,24 @@ window.DiffEngine = {
   _buildSharedPartQuestion: function (id, sharedText, correctLocations, corpusByGid, settings) {
     const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
     const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+    const sample = (arr, count) => {
+      if (count >= arr.length) return shuffle(arr);
+      const out = [];
+      const used = new Set();
+      while (out.length < count && used.size < arr.length) {
+        const idx = Math.floor(Math.random() * arr.length);
+        if (used.has(idx)) continue;
+        used.add(idx);
+        out.push(arr[idx]);
+      }
+      return out;
+    };
     const refOf = (v) => v.sura_name + " " + v.aya_id;
     const sameSet = (a, b) => a.length === b.length && a.every(g => b.includes(g));
     const eligibleForPool = (v) => window.Scope.eligibleDistractor(v, settings.pool, settings.selection, map);
-    const byGid = new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
+    const byGid = (corpusByGid && typeof corpusByGid.get === 'function' && typeof corpusByGid.has === 'function')
+      ? corpusByGid
+      : new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
     const optionFrom = (locations) => {
       const ordered = Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
       const refs = ordered.map(g => refOf(byGid.get(g)));
@@ -148,19 +182,19 @@ window.DiffEngine = {
     };
 
     const optionLimit = this._optionLimit(settings);
-    const fakePoolGids = Array.from(corpusByGid.values()).filter(eligibleForPool).map(v => v.gid);
+    const fakePoolGids = settings._poolGids || Array.from(corpusByGid.values()).filter(eligibleForPool).map(v => v.gid);
     const outsiders = fakePoolGids.filter(g => !correctLocations.includes(g));
 
-    correctLocations.forEach((gid, idx) => shuffle(outsiders).slice(0, 8).forEach(g => addWrong(correctLocations.map((x, i) => i === idx ? g : x))));
-    shuffle(outsiders).slice(0, 8).forEach(g => addWrong([...correctLocations, g]));
+    correctLocations.forEach((gid, idx) => sample(outsiders, 8).forEach(g => addWrong(correctLocations.map((x, i) => i === idx ? g : x))));
+    sample(outsiders, 8).forEach(g => addWrong([...correctLocations, g]));
     correctLocations.forEach(g => addWrong([g]));
-    shuffle(fakePoolGids).slice(0, 12).forEach(g => addWrong([g]));
+    sample(fakePoolGids, 12).forEach(g => addWrong([g]));
 
     for (let i = 0; i < 80 && wrongSets.length < optionLimit * 4; i++) {
       const maxSize = Math.min(fakePoolGids.length, Math.max(2, correctLocations.length + 2));
       const minSize = Math.min(maxSize, correctLocations.length > 1 ? 2 : 1);
       const size = minSize + Math.floor(Math.random() * (maxSize - minSize + 1));
-      addWrong(shuffle(fakePoolGids).slice(0, size));
+      addWrong(sample(fakePoolGids, size));
     }
 
     const options = shuffle([
@@ -188,6 +222,11 @@ window.DiffEngine = {
     settings = Object.assign({
       quranTextFormat: 'uthmani', selection: { mode: 'all' }, pool: 'all', optionCap: 3
     }, settings);
+
+    const index = this._getSharedPartIndex(allGroups);
+    if (index) {
+      return index.sampleQuestions(settings, limit);
+    }
 
     const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
     const corpusByGid = this._corpusByGid(allGroups, settings);
@@ -479,28 +518,68 @@ window.DiffEngine = {
   },
 
   generateMixedQuestions: function (targetGroups, allGroups, settings = {}, length = 10) {
-    const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
-    const groups = shuffle(targetGroups || []);
-    const corpusShared = shuffle(this.generateCorpusSharedPartQuestions(allGroups, settings, length));
-    const used = new Set();
-    const take = (type, count) => {
-      const out = [];
-      if (type === 'sharedPart') {
-        for (const q of corpusShared) {
-          if (out.length >= count) break;
-          const key = 'corpus:' + q.id;
-          if (used.has(key)) continue;
-          used.add(key);
-          out.push(q);
-        }
+    const shuffle = (arr) => {
+      const out = [...arr];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
       }
-      for (const g of groups) {
-        if (out.length >= count) break;
+      return out;
+    };
+    const groups = [...(targetGroups || [])];
+    const corpusShared = shuffle(this.generateCorpusSharedPartQuestions(allGroups, settings, length));
+    const groupCursor = { completion: 0, sharedPart: 0 };
+    const settingsByType = {
+      completion: Object.assign({}, settings, { quizType: 'completion' }),
+      sharedPart: Object.assign({}, settings, { quizType: 'sharedPart' })
+    };
+    let sharedCursor = 0;
+    let shuffledGroups = 0;
+    const used = new Set();
+
+    const groupAt = (idx) => {
+      while (shuffledGroups <= idx && shuffledGroups < groups.length) {
+        const j = shuffledGroups + Math.floor(Math.random() * (groups.length - shuffledGroups));
+        [groups[shuffledGroups], groups[j]] = [groups[j], groups[shuffledGroups]];
+        shuffledGroups++;
+      }
+      return groups[idx];
+    };
+
+    const nextCorpusShared = () => {
+      while (sharedCursor < corpusShared.length) {
+        const q = corpusShared[sharedCursor++];
+        const key = 'corpus:' + q.id;
+        if (used.has(key)) continue;
+        used.add(key);
+        return q;
+      }
+      return null;
+    };
+
+    const nextGroupQuestion = (type) => {
+      while (groupCursor[type] < groups.length) {
+        const g = groupAt(groupCursor[type]++);
         const key = type + ':' + g.id;
         if (used.has(key)) continue;
-        const q = this._generateQuestionByType(type, g, allGroups, Object.assign({}, settings, { quizType: type }));
+        const q = this._generateQuestionByType(type, g, allGroups, settingsByType[type]);
         if (!q) continue;
         used.add(key);
+        return q;
+      }
+      return null;
+    };
+
+    const takeOne = (type) =>
+      type === 'sharedPart'
+        ? (nextCorpusShared() || nextGroupQuestion(type))
+        : nextGroupQuestion(type);
+
+    const take = (type, count) => {
+      const out = [];
+      while (out.length < count) {
+        const q = takeOne(type);
+        if (!q) break;
         out.push(q);
       }
       return out;

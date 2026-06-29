@@ -2,7 +2,7 @@
 // إدارة حالة التطبيق والمنطق التفاعلي باستخدام Vue 3
 // الأسئلة بمفاتيح المواضع (Location-keyed) — راجع CONTEXT.md و ADR-0001.
 
-const { createApp, ref, computed, onMounted } = Vue;
+const { createApp, ref, computed, onMounted, watch } = Vue;
 
 createApp({
   setup() {
@@ -122,6 +122,7 @@ createApp({
         isLoaded.value = true;
         if (localStorage.getItem("theme") === "light") darkMode.value = false;
         applyTheme();
+        scheduleSharedPartWarm();
       } catch (e) {
         console.error("فشل تحميل بيانات المتشابهات:", e);
         alert("حدث خطأ أثناء تحميل بيانات التطبيق.");
@@ -139,10 +140,9 @@ createApp({
       return out.sort(() => Math.random() - 0.5);
     };
 
-    // توليد الأسئلة لمجموعات الهدف (مع تجاوز pool اختياري لملء النطاق المحدود)
-    const generateAll = (overridePool) => {
+    const buildSettings = (overridePool) => {
       const sel = buildSelection();
-      const settings = {
+      return {
         quranTextFormat: quranTextFormat.value,
         gapMode: gapMode.value,
         contextCountBefore: parseInt(contextCountBefore.value),
@@ -155,6 +155,32 @@ createApp({
         quizType: quizType.value,
         mixedStrategy: mixedStrategy.value
       };
+    };
+
+    let sharedPartWarmTimer = null;
+    const scheduleSharedPartWarm = () => {
+      if (!isLoaded.value || quizType.value === 'completion' || !window.SharedPartIndex) return;
+      if (sharedPartWarmTimer) {
+        if (sharedPartWarmTimer.type === 'idle' && window.cancelIdleCallback) cancelIdleCallback(sharedPartWarmTimer.id);
+        else clearTimeout(sharedPartWarmTimer.id);
+      }
+      const run = () => {
+        sharedPartWarmTimer = null;
+        const index = window.DiffEngine._getSharedPartIndex(similaritiesData.value);
+        if (index) index.questionBank(buildSettings(), Math.max(quizLength.value, 120));
+      };
+      if (window.requestIdleCallback) {
+        sharedPartWarmTimer = { type: 'idle', id: requestIdleCallback(run, { timeout: 500 }) };
+      } else {
+        sharedPartWarmTimer = { type: 'timeout', id: setTimeout(run, 0) };
+      }
+    };
+    watch([quizType, quranTextFormat, selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, quizLength], scheduleSharedPartWarm, { deep: true });
+
+    // توليد الأسئلة لمجموعات الهدف (مع تجاوز pool اختياري لملء النطاق المحدود)
+    const generateAll = (overridePool) => {
+      const settings = buildSettings(overridePool);
+      const sel = settings.selection;
       const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
       const targetGroups = similaritiesData.value
         .filter(g => g.verses && g.verses.some(v => window.Scope.inSelection(v, sel, map)))
