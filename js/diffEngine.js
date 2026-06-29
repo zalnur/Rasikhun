@@ -516,28 +516,68 @@ window.DiffEngine = {
   },
 
   generateMixedQuestions: function (targetGroups, allGroups, settings = {}, length = 10) {
-    const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
-    const groups = shuffle(targetGroups || []);
-    const corpusShared = shuffle(this.generateCorpusSharedPartQuestions(allGroups, settings, length));
-    const used = new Set();
-    const take = (type, count) => {
-      const out = [];
-      if (type === 'sharedPart') {
-        for (const q of corpusShared) {
-          if (out.length >= count) break;
-          const key = 'corpus:' + q.id;
-          if (used.has(key)) continue;
-          used.add(key);
-          out.push(q);
-        }
+    const shuffle = (arr) => {
+      const out = [...arr];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
       }
-      for (const g of groups) {
-        if (out.length >= count) break;
+      return out;
+    };
+    const groups = [...(targetGroups || [])];
+    const corpusShared = shuffle(this.generateCorpusSharedPartQuestions(allGroups, settings, length));
+    const groupCursor = { completion: 0, sharedPart: 0 };
+    const settingsByType = {
+      completion: Object.assign({}, settings, { quizType: 'completion' }),
+      sharedPart: Object.assign({}, settings, { quizType: 'sharedPart' })
+    };
+    let sharedCursor = 0;
+    let shuffledGroups = 0;
+    const used = new Set();
+
+    const groupAt = (idx) => {
+      while (shuffledGroups <= idx && shuffledGroups < groups.length) {
+        const j = shuffledGroups + Math.floor(Math.random() * (groups.length - shuffledGroups));
+        [groups[shuffledGroups], groups[j]] = [groups[j], groups[shuffledGroups]];
+        shuffledGroups++;
+      }
+      return groups[idx];
+    };
+
+    const nextCorpusShared = () => {
+      while (sharedCursor < corpusShared.length) {
+        const q = corpusShared[sharedCursor++];
+        const key = 'corpus:' + q.id;
+        if (used.has(key)) continue;
+        used.add(key);
+        return q;
+      }
+      return null;
+    };
+
+    const nextGroupQuestion = (type) => {
+      while (groupCursor[type] < groups.length) {
+        const g = groupAt(groupCursor[type]++);
         const key = type + ':' + g.id;
         if (used.has(key)) continue;
-        const q = this._generateQuestionByType(type, g, allGroups, Object.assign({}, settings, { quizType: type }));
+        const q = this._generateQuestionByType(type, g, allGroups, settingsByType[type]);
         if (!q) continue;
         used.add(key);
+        return q;
+      }
+      return null;
+    };
+
+    const takeOne = (type) =>
+      type === 'sharedPart'
+        ? (nextCorpusShared() || nextGroupQuestion(type))
+        : nextGroupQuestion(type);
+
+    const take = (type, count) => {
+      const out = [];
+      while (out.length < count) {
+        const q = takeOne(type);
+        if (!q) break;
         out.push(q);
       }
       return out;

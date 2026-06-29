@@ -59,6 +59,11 @@ const measure = (iterations, fn) => {
 console.log('perf) warm Shared-Part and Mixed response budgets');
 const juz1 = settings({ mode: 'juz', juz: 1 });
 const all = settings({ mode: 'all' }, { pool: 'all' });
+const pages1To300Random = settings(
+  { mode: 'pages', pageFrom: 1, pageTo: 300 },
+  { mixedStrategy: 'random' }
+);
+const pages1To300TargetGroups = targetGroups(pages1To300Random.selection);
 
 let t0 = performance.now();
 DE._sharedPartIndexCache = null;
@@ -68,21 +73,30 @@ assert(coldAll.length === 30, 'cold all-quran shared generation should produce 3
 assert(coldAllMs < 2000, `cold all-quran shared generation should not timeout class (>2000ms), got ${coldAllMs.toFixed(2)}ms`);
 
 DE.generateCorpusSharedPartQuestions(groups, juz1, 30);
+DE.generateCorpusSharedPartQuestions(groups, pages1To300Random, 100);
 const sharedJuz = measure(1000, () => DE.generateCorpusSharedPartQuestions(groups, juz1, 30));
 const sharedAll = measure(1000, () => DE.generateCorpusSharedPartQuestions(groups, all, 30));
 const mixedAll = measure(1000, () => DE.generateMixedQuestions(targetGroups({ mode: 'all' }), groups, all, 30));
+const mixedPagesRandom = measure(1000, () => DE.generateMixedQuestions(pages1To300TargetGroups, groups, pages1To300Random, 30));
+const mixedPagesRandom100 = measure(1000, () => DE.generateMixedQuestions(pages1To300TargetGroups, groups, pages1To300Random, 100));
 
 console.log(`   cold all shared 30: ${coldAllMs.toFixed(3)}ms`);
 console.log(`   warm juz1 shared 30 p95: ${sharedJuz.p95.toFixed(3)}ms`);
 console.log(`   warm all shared 30 p95: ${sharedAll.p95.toFixed(3)}ms`);
 console.log(`   warm all mixed 30 p95: ${mixedAll.p95.toFixed(3)}ms`);
+console.log(`   warm pages 1-300 mixed random 30 p95: ${mixedPagesRandom.p95.toFixed(3)}ms`);
+console.log(`   warm pages 1-300 mixed random 100 p95: ${mixedPagesRandom100.p95.toFixed(3)}ms`);
 
 assert(sharedJuz.result.length === 30, 'warm juz1 shared should produce 30 questions');
 assert(sharedAll.result.length === 30, 'warm all shared should produce 30 questions');
 assert(mixedAll.result.length === 30, 'warm all mixed should produce 30 questions');
+assert(mixedPagesRandom.result.length === 30, 'warm pages 1-300 mixed random should produce 30 questions');
+assert(mixedPagesRandom100.result.length === 100, 'warm pages 1-300 mixed random should produce 100 questions');
 assert(sharedJuz.p95 < 1, `warm juz1 shared p95 should stay below 1ms, got ${sharedJuz.p95.toFixed(3)}ms`);
 assert(sharedAll.p95 < 1, `warm all shared p95 should stay below 1ms, got ${sharedAll.p95.toFixed(3)}ms`);
 assert(mixedAll.p95 < 1, `warm all mixed p95 should stay below 1ms, got ${mixedAll.p95.toFixed(3)}ms`);
+assert(mixedPagesRandom.p95 < 0.5, `warm pages 1-300 mixed random p95 should stay below 0.5ms, got ${mixedPagesRandom.p95.toFixed(3)}ms`);
+assert(mixedPagesRandom100.p95 < 1, `warm pages 1-300 mixed random 100 p95 should stay below 1ms, got ${mixedPagesRandom100.p95.toFixed(3)}ms`);
 
 console.log('\n' + (failures === 0 ? '✅ PERF CHECKS PASSED' : `❌ ${failures} PERF FAILURE(S)`));
 process.exit(failures === 0 ? 0 : 1);
