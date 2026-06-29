@@ -8,7 +8,24 @@
   const plainWord = (word) => window.DiffEngine._plainWord(word || "");
   const formatText = (v, format) => (format === 'uthmani' && v.uthmani) ? v.uthmani : v.text;
   const sortedNums = (xs) => Array.from(new Set(xs)).sort((a, b) => a - b);
-  const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
+  const shuffle = (arr) => {
+    const out = [...arr];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  };
+  const plainWordCache = new Map();
+  const cleanWordCache = new Map();
+  const cachedPlainWord = (word) => {
+    if (!plainWordCache.has(word)) plainWordCache.set(word, plainWord(word));
+    return plainWordCache.get(word);
+  };
+  const cachedCleanWord = (word) => {
+    if (!cleanWordCache.has(word)) cleanWordCache.set(word, cleanText(word));
+    return cleanWordCache.get(word);
+  };
 
   const selectionKey = (selection) => {
     selection = selection || DEFAULT_SELECTION;
@@ -72,33 +89,40 @@
       const phraseMap = new Map();
 
       verses.forEach(v => {
+        const words = v.text.split(/\s+/).filter(Boolean);
+        const plainWords = words.map(cachedPlainWord);
+        const cleanWords = words.map(cachedCleanWord);
         const versePlainWords = new Set();
-        v.text.split(/\s+/).filter(Boolean).forEach(word => {
-          stripCliticForms(plainWord(word)).forEach(w => {
+        plainWords.forEach(plain => {
+          stripCliticForms(plain).forEach(w => {
             if (w.length > 1) versePlainWords.add(w);
           });
         });
         versePlainWords.forEach(w => addToSetMap(plainWordToGids, w, v.gid));
 
-        const words = v.text.split(/\s+/).filter(Boolean);
         const seen = new Set();
-        for (let len = Math.min(5, words.length); len >= 2; len--) {
-          for (let i = 0; i <= words.length - len; i++) {
-            const text = words.slice(i, i + len).join(" ");
-            const key = cleanText(text);
-            if (!key || seen.has(key)) continue;
-            seen.add(key);
-            if (!phraseMap.has(key)) phraseMap.set(key, { key, text, wordCount: len, exactGids: [], exactEndGids: [] });
-            const p = phraseMap.get(key);
+        for (let i = 0; i < words.length - 1; i++) {
+          let text = "";
+          let key = "";
+          const maxLen = Math.min(5, words.length - i);
+          for (let len = 1; len <= maxLen; len++) {
+            const idx = i + len - 1;
+            text = len === 1 ? words[idx] : text + " " + words[idx];
+            key = len === 1 ? cleanWords[idx] : key + " " + cleanWords[idx];
+            if (len < 2) continue;
+            const phraseKey = key.trim();
+            if (!phraseKey || seen.has(phraseKey)) continue;
+            seen.add(phraseKey);
+            if (!phraseMap.has(phraseKey)) phraseMap.set(phraseKey, { key: phraseKey, text, wordCount: len, exactGids: [] });
+            const p = phraseMap.get(phraseKey);
             p.exactGids.push(v.gid);
-            if (i + len === words.length) p.exactEndGids.push(v.gid);
           }
         }
       });
 
       const repeatedPhrases = Array.from(phraseMap.values())
         .filter(p => p.exactGids.length >= 2)
-        .map(p => ({ ...p, plainWords: Array.from(new Set(p.text.split(/\s+/).map(plainWord).filter(w => w.length > 1))) }));
+        .map(p => ({ ...p, plainWords: Array.from(new Set(p.text.split(/\s+/).map(cachedPlainWord).filter(w => w.length > 1))) }));
       const idx = { corpusByGid, verses, cleanByGid, plainWordToGids, repeatedPhrases };
       formatCache.set(format, idx);
       return idx;
@@ -107,6 +131,41 @@
     const getGroupPairs = () => {
       if (!groupPairs) groupPairs = window.DiffEngine._groupPairSet(groups || []);
       return groupPairs;
+    };
+
+    const contentWordCountCache = new Map();
+    const contentWordCount = (text) => {
+      if (!contentWordCountCache.has(text)) {
+        contentWordCountCache.set(text, window.DiffEngine._contentWordCount(text));
+      }
+      return contentWordCountCache.get(text);
+    };
+
+    const isGroupBacked = (gids, locKey, pairs, cache) => {
+      if (cache.has(locKey)) return cache.get(locKey);
+      for (let i = 0; i < gids.length; i++) {
+        for (let j = i + 1; j < gids.length; j++) {
+          if (pairs.has(gids[i] + ':' + gids[j])) {
+            cache.set(locKey, true);
+            return true;
+          }
+        }
+      }
+      cache.set(locKey, false);
+      return false;
+    };
+
+    const scoreSharedCandidate = (phrase, gids, endCount, locKey, pairs, groupBackedCache) => {
+      const wordScore = ({ 2: 8, 3: 9, 4: 7, 5: 5 })[phrase.wordCount] || 0;
+      const locationCount = gids.length;
+      const locationScore = locationCount === 2 ? 10 : locationCount === 3 ? 8 : locationCount <= 5 ? 6 : locationCount <= 8 ? 3 : 0;
+      const contentScore = Math.min(6, contentWordCount(phrase.text) * 2);
+      const concisePairBonus = phrase.wordCount === 2 && locationCount === 2 ? 4 : 0;
+      const endingBonus = endCount === locationCount ? 4 : 0;
+      const groupBonus = isGroupBacked(gids, locKey, pairs, groupBackedCache) ? 3 : 0;
+      const broadPenalty = locationCount > 12 ? 6 : 0;
+      const emptyPenalty = contentScore === 0 ? 12 : 0;
+      return wordScore + locationScore + contentScore + concisePairBonus + endingBonus + groupBonus - broadPenalty - emptyPenalty;
     };
 
     const selectedGids = (selection, format) => {
@@ -138,21 +197,28 @@
       return gids;
     };
 
-    const matchingGids = (phrase, settings) => {
+    const matchingGids = (phrase, settings, idx, selected) => {
       const format = settings.quranTextFormat || 'uthmani';
-      const idx = formatIndex(format);
-      const selected = selectedGids(settings.selection || DEFAULT_SELECTION, format);
-      let source = selected.list;
+      idx = idx || formatIndex(format);
+      selected = selected || selectedGids(settings.selection || DEFAULT_SELECTION, format);
+      let sourceSet = null;
+      let sourceSize = selected.list.length;
 
       phrase.plainWords.forEach(w => {
         const gids = idx.plainWordToGids.get(w);
         if (!gids) return;
-        if (source === selected.list || gids.size < source.length) source = Array.from(gids);
+        if (gids.size < sourceSize) {
+          sourceSet = gids;
+          sourceSize = gids.size;
+        }
       });
 
-      return source
-        .filter(gid => selected.set.has(gid) && idx.cleanByGid.get(gid).includes(phrase.key))
-        .sort((a, b) => a - b);
+      const source = sourceSet ? Array.from(sourceSet) : selected.list;
+      const allSelected = selected.list.length === idx.verses.length;
+      const matched = allSelected
+        ? source.filter(gid => idx.cleanByGid.get(gid).includes(phrase.key))
+        : source.filter(gid => selected.set.has(gid) && idx.cleanByGid.get(gid).includes(phrase.key));
+      return matched;
     };
 
     const sharedCandidates = (settings) => {
@@ -162,25 +228,23 @@
 
       const idx = formatIndex(format);
       const selected = selectedGids(settings.selection || DEFAULT_SELECTION, format);
+      const allSelected = selected.list.length === idx.verses.length;
       const byLocations = new Map();
       const pairs = getGroupPairs();
+      const groupBackedCache = new Map();
 
       idx.repeatedPhrases.forEach(p => {
-        let exactCount = 0;
-        for (const gid of p.exactGids) if (selected.set.has(gid)) exactCount++;
+        let exactCount = allSelected ? p.exactGids.length : 0;
+        if (!allSelected) for (const gid of p.exactGids) if (selected.set.has(gid)) exactCount++;
         if (exactCount < 2) return;
 
-        const gids = matchingGids(p, settings);
+        const gids = matchingGids(p, settings, idx, selected);
         if (gids.length < 2) return;
-        const candidate = {
-          text: p.text,
-          wordCount: p.wordCount,
-          gids: new Set(gids),
-          endGids: new Set(gids.filter(g => idx.cleanByGid.get(g).endsWith(p.key)))
-        };
-        const score = window.DiffEngine._scoreSharedCandidate(candidate, pairs);
-        if (score <= 0) return;
         const locKey = gids.join(',');
+        let endCount = 0;
+        gids.forEach(g => { if (idx.cleanByGid.get(g).endsWith(p.key)) endCount++; });
+        const score = scoreSharedCandidate(p, gids, endCount, locKey, pairs, groupBackedCache);
+        if (score <= 0) return;
         const current = byLocations.get(locKey);
         if (!current || score > current.score) byLocations.set(locKey, {
           id: 'corpus:' + p.key,

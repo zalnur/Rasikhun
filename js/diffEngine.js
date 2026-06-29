@@ -162,7 +162,9 @@ window.DiffEngine = {
     const refOf = (v) => v.sura_name + " " + v.aya_id;
     const sameSet = (a, b) => a.length === b.length && a.every(g => b.includes(g));
     const eligibleForPool = (v) => window.Scope.eligibleDistractor(v, settings.pool, settings.selection, map);
-    const byGid = new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
+    const byGid = (corpusByGid && typeof corpusByGid.get === 'function' && typeof corpusByGid.has === 'function')
+      ? corpusByGid
+      : new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
     const optionFrom = (locations) => {
       const ordered = Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
       const refs = ordered.map(g => refOf(byGid.get(g)));

@@ -70,7 +70,7 @@ DE._sharedPartIndexCache = null;
 const coldAll = DE.generateCorpusSharedPartQuestions(groups, all, 30);
 const coldAllMs = performance.now() - t0;
 assert(coldAll.length === 30, 'cold all-quran shared generation should produce 30 questions');
-assert(coldAllMs < 2000, `cold all-quran shared generation should not timeout class (>2000ms), got ${coldAllMs.toFixed(2)}ms`);
+assert(coldAllMs < 900, `cold all-quran shared generation should stay below 900ms, got ${coldAllMs.toFixed(2)}ms`);
 
 DE.generateCorpusSharedPartQuestions(groups, juz1, 30);
 DE.generateCorpusSharedPartQuestions(groups, pages1To300Random, 100);
