@@ -2,7 +2,7 @@
   "scripts": {
     "build": "tailwindcss -i ./css/tailwind.input.css -o ./css/tailwind.css --minify",
     "dev:css": "tailwindcss -i ./css/tailwind.input.css -o ./css/tailwind.css --watch",
-    "test": "node tests/test_fonts.js && node tests/test_engine.js && node tests/test_perf.js"
+    "test": "node tests/test_fonts.js && node tests/test_app_warm.js && node tests/test_engine.js && node tests/test_perf.js"
   },
   "devDependencies": {
     "tailwindcss": "3.4.17"

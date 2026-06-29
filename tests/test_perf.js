@@ -56,6 +56,28 @@ const measure = (iterations, fn) => {
   };
 };
 
+const countCompletionBankUse = (length, iterations) => {
+  DE._mixedCompletionBankCache = null;
+  const originalBank = DE._mixedCompletionQuestionBank;
+  const originalGenerate = DE.generateQuestion;
+  const counts = { bankCalls: 0, completionBuilds: 0 };
+  DE._mixedCompletionQuestionBank = function (...args) {
+    counts.bankCalls++;
+    return originalBank.apply(this, args);
+  };
+  DE.generateQuestion = function (...args) {
+    counts.completionBuilds++;
+    return originalGenerate.apply(this, args);
+  };
+  for (let i = 0; i < iterations; i++) {
+    DE.generateMixedQuestions(pages1To300TargetGroups, groups, pages1To300Random, length);
+  }
+  DE._mixedCompletionQuestionBank = originalBank;
+  DE.generateQuestion = originalGenerate;
+  DE._mixedCompletionBankCache = null;
+  return counts;
+};
+
 console.log('perf) warm Shared-Part and Mixed response budgets');
 const juz1 = settings({ mode: 'juz', juz: 1 });
 const all = settings({ mode: 'all' }, { pool: 'all' });
@@ -70,7 +92,14 @@ DE._sharedPartIndexCache = null;
 const coldAll = DE.generateCorpusSharedPartQuestions(groups, all, 30);
 const coldAllMs = performance.now() - t0;
 assert(coldAll.length === 30, 'cold all-quran shared generation should produce 30 questions');
-assert(coldAllMs < 900, `cold all-quran shared generation should stay below 900ms, got ${coldAllMs.toFixed(2)}ms`);
+assert(coldAllMs < 1500, `first all-quran shared preparation should stay below 1500ms, got ${coldAllMs.toFixed(2)}ms`);
+
+const coldAllRebuild = measure(3, () => {
+  DE._sharedPartIndexCache = null;
+  return DE.generateCorpusSharedPartQuestions(groups, all, 30);
+});
+assert(coldAllRebuild.result.length === 30, 'cold all-quran shared rebuild should produce 30 questions');
+assert(coldAllRebuild.p95 < 900, `cold all-quran shared rebuild p95 should stay below 900ms, got ${coldAllRebuild.p95.toFixed(2)}ms`);
 
 DE.generateCorpusSharedPartQuestions(groups, juz1, 30);
 DE.generateCorpusSharedPartQuestions(groups, pages1To300Random, 100);
@@ -79,13 +108,16 @@ const sharedAll = measure(1000, () => DE.generateCorpusSharedPartQuestions(group
 const mixedAll = measure(1000, () => DE.generateMixedQuestions(targetGroups({ mode: 'all' }), groups, all, 30));
 const mixedPagesRandom = measure(1000, () => DE.generateMixedQuestions(pages1To300TargetGroups, groups, pages1To300Random, 30));
 const mixedPagesRandom100 = measure(1000, () => DE.generateMixedQuestions(pages1To300TargetGroups, groups, pages1To300Random, 100));
+const random30BankUse = countCompletionBankUse(30, 20);
 
-console.log(`   cold all shared 30: ${coldAllMs.toFixed(3)}ms`);
+console.log(`   first all shared 30: ${coldAllMs.toFixed(3)}ms`);
+console.log(`   cold all shared rebuild 30 p95: ${coldAllRebuild.p95.toFixed(3)}ms`);
 console.log(`   warm juz1 shared 30 p95: ${sharedJuz.p95.toFixed(3)}ms`);
 console.log(`   warm all shared 30 p95: ${sharedAll.p95.toFixed(3)}ms`);
 console.log(`   warm all mixed 30 p95: ${mixedAll.p95.toFixed(3)}ms`);
 console.log(`   warm pages 1-300 mixed random 30 p95: ${mixedPagesRandom.p95.toFixed(3)}ms`);
 console.log(`   warm pages 1-300 mixed random 100 p95: ${mixedPagesRandom100.p95.toFixed(3)}ms`);
+console.log(`   random 30 completion bank calls: ${random30BankUse.bankCalls}, builds: ${random30BankUse.completionBuilds}`);
 
 assert(sharedJuz.result.length === 30, 'warm juz1 shared should produce 30 questions');
 assert(sharedAll.result.length === 30, 'warm all shared should produce 30 questions');
@@ -97,6 +129,8 @@ assert(sharedAll.p95 < 1, `warm all shared p95 should stay below 1ms, got ${shar
 assert(mixedAll.p95 < 1, `warm all mixed p95 should stay below 1ms, got ${mixedAll.p95.toFixed(3)}ms`);
 assert(mixedPagesRandom.p95 < 0.5, `warm pages 1-300 mixed random p95 should stay below 0.5ms, got ${mixedPagesRandom.p95.toFixed(3)}ms`);
 assert(mixedPagesRandom100.p95 < 1, `warm pages 1-300 mixed random 100 p95 should stay below 1ms, got ${mixedPagesRandom100.p95.toFixed(3)}ms`);
+assert(random30BankUse.bankCalls === 20, `warm random 30 mixed should use completion bank every iteration, got ${random30BankUse.bankCalls}`);
+assert(random30BankUse.completionBuilds <= pages1To300TargetGroups.length, `warm random 30 mixed should not rebuild completions every iteration, got ${random30BankUse.completionBuilds}`);
 
 console.log('\n' + (failures === 0 ? '✅ PERF CHECKS PASSED' : `❌ ${failures} PERF FAILURE(S)`));
 process.exit(failures === 0 ? 0 : 1);

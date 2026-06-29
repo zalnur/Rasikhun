@@ -7,25 +7,6 @@ window.DiffEngine = {
     return text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").trim();
   },
 
-  _formatVerseText: function (v, settings) {
-    return (settings.quranTextFormat === 'uthmani' && window.quranText && window.quranText[v.gid] && window.quranText[v.gid].uthmani)
-      ? window.quranText[v.gid].uthmani : v.text;
-  },
-
-  _corpusByGid: function (allGroups, settings) {
-    const corpusByGid = new Map();
-    if (window.quranText) {
-      Object.entries(window.quranText).forEach(([gid, v]) => {
-        const g = parseInt(gid);
-        corpusByGid.set(g, { ...v, gid: g, text: this._formatVerseText({ ...v, gid: g }, settings) });
-      });
-    }
-    (allGroups || []).forEach(g => (g.verses || []).forEach(v => {
-      if (!corpusByGid.has(v.gid)) corpusByGid.set(v.gid, { ...v, text: this._formatVerseText(v, settings) });
-    }));
-    return corpusByGid;
-  },
-
   _getSharedPartIndex: function (allGroups) {
     if (!window.SharedPartIndex) return null;
     if (!this._sharedPartIndexCache ||
@@ -91,196 +72,13 @@ window.DiffEngine = {
     return min + Math.floor(Math.random() * (max - min + 1));
   },
 
-  _plainWord: function (word) {
-    return this._cleanText(word)
-      .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, "")
-      .replace(/[إأٱآ]/g, "ا")
-      .replace(/ى/g, "ي")
-      .replace(/[ؤ]/g, "و")
-      .replace(/[ئ]/g, "ي")
-      .replace(/ة/g, "ه")
-      .replace(/[^\u0621-\u064A]/g, "");
-  },
-
-  _contentWordCount: function (text) {
-    const stop = new Set([
-      "و", "ف", "ثم", "او", "ام", "بل", "لا", "ما", "من", "في", "عن", "علي", "الى",
-      "ان", "انما", "قد", "لقد", "كل", "هذا", "هذه", "ذلك", "تلك", "هو", "هي", "هم",
-      "الذي", "الذين", "التي", "يا", "ايها"
-    ]);
-    return text.split(/\s+/).map(w => this._plainWord(w)).filter(w => w.length > 1 && !stop.has(w)).length;
-  },
-
-  _groupPairSet: function (allGroups) {
-    const pairs = new Set();
-    (allGroups || []).forEach(g => {
-      const gids = (g.verses || []).map(v => v.gid).filter(Boolean);
-      for (let i = 0; i < gids.length; i++) {
-        for (let j = i + 1; j < gids.length; j++) pairs.add([gids[i], gids[j]].sort((a, b) => a - b).join(':'));
-      }
-    });
-    return pairs;
-  },
-
-  _isGroupBacked: function (gids, groupPairs) {
-    for (let i = 0; i < gids.length; i++) {
-      for (let j = i + 1; j < gids.length; j++) {
-        if (groupPairs.has([gids[i], gids[j]].sort((a, b) => a - b).join(':'))) return true;
-      }
-    }
-    return false;
-  },
-
-  _scoreSharedCandidate: function (phrase, groupPairs) {
-    const wordScore = ({ 2: 8, 3: 9, 4: 7, 5: 5 })[phrase.wordCount] || 0;
-    const locationCount = phrase.gids.size;
-    const locationScore = locationCount === 2 ? 10 : locationCount === 3 ? 8 : locationCount <= 5 ? 6 : locationCount <= 8 ? 3 : 0;
-    const contentScore = Math.min(6, this._contentWordCount(phrase.text) * 2);
-    const concisePairBonus = phrase.wordCount === 2 && locationCount === 2 ? 4 : 0;
-    const endingBonus = phrase.endGids && phrase.endGids.size === locationCount ? 4 : 0;
-    const groupBonus = this._isGroupBacked(Array.from(phrase.gids), groupPairs) ? 3 : 0;
-    const broadPenalty = locationCount > 12 ? 6 : 0;
-    const emptyPenalty = contentScore === 0 ? 12 : 0;
-    return wordScore + locationScore + contentScore + concisePairBonus + endingBonus + groupBonus - broadPenalty - emptyPenalty;
-  },
-
-  _buildSharedPartQuestion: function (id, sharedText, correctLocations, corpusByGid, settings) {
-    const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
-    const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
-    const sample = (arr, count) => {
-      if (count >= arr.length) return shuffle(arr);
-      const out = [];
-      const used = new Set();
-      while (out.length < count && used.size < arr.length) {
-        const idx = Math.floor(Math.random() * arr.length);
-        if (used.has(idx)) continue;
-        used.add(idx);
-        out.push(arr[idx]);
-      }
-      return out;
-    };
-    const refOf = (v) => v.sura_name + " " + v.aya_id;
-    const sameSet = (a, b) => a.length === b.length && a.every(g => b.includes(g));
-    const eligibleForPool = (v) => window.Scope.eligibleDistractor(v, settings.pool, settings.selection, map);
-    const byGid = (corpusByGid && typeof corpusByGid.get === 'function' && typeof corpusByGid.has === 'function')
-      ? corpusByGid
-      : new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
-    const optionFrom = (locations) => {
-      const ordered = Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
-      const refs = ordered.map(g => refOf(byGid.get(g)));
-      return { text: refs.join(" • "), locations: ordered, refs: refs };
-    };
-
-    correctLocations = Array.from(new Set(correctLocations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
-    if (correctLocations.length < 2) return null;
-
-    const wrongSets = [];
-    const addWrong = (locations) => {
-      const ordered = optionFrom(locations).locations;
-      if (!ordered.length || sameSet(ordered, correctLocations) || wrongSets.some(s => sameSet(s, ordered))) return;
-      wrongSets.push(ordered);
-    };
-
-    const optionLimit = this._optionLimit(settings);
-    const fakePoolGids = settings._poolGids || Array.from(corpusByGid.values()).filter(eligibleForPool).map(v => v.gid);
-    const outsiders = fakePoolGids.filter(g => !correctLocations.includes(g));
-
-    correctLocations.forEach((gid, idx) => sample(outsiders, 8).forEach(g => addWrong(correctLocations.map((x, i) => i === idx ? g : x))));
-    sample(outsiders, 8).forEach(g => addWrong([...correctLocations, g]));
-    correctLocations.forEach(g => addWrong([g]));
-    sample(fakePoolGids, 12).forEach(g => addWrong([g]));
-
-    for (let i = 0; i < 80 && wrongSets.length < optionLimit * 4; i++) {
-      const maxSize = Math.min(fakePoolGids.length, Math.max(2, correctLocations.length + 2));
-      const minSize = Math.min(maxSize, correctLocations.length > 1 ? 2 : 1);
-      const size = minSize + Math.floor(Math.random() * (maxSize - minSize + 1));
-      addWrong(sample(fakePoolGids, size));
-    }
-
-    const options = shuffle([
-      optionFrom(correctLocations),
-      ...shuffle(wrongSets).slice(0, optionLimit - 1).map(optionFrom)
-    ]);
-    if (options.length < 2) return null;
-
-    return {
-      id: id,
-      type: 'sharedPart',
-      sharedText: sharedText,
-      correctAnswer: correctLocations[0],
-      correctLocations: correctLocations,
-      options: options,
-      matchingVerses: correctLocations.map(g => byGid.get(g)).map(v => ({
-        gid: v.gid,
-        ref: refOf(v),
-        text: v.text
-      }))
-    };
-  },
-
   generateCorpusSharedPartQuestions: function (allGroups, settings = {}, limit = 20) {
     settings = Object.assign({
       quranTextFormat: 'uthmani', selection: { mode: 'all' }, pool: 'all', optionCap: 3
     }, settings);
 
     const index = this._getSharedPartIndex(allGroups);
-    if (index) {
-      return index.sampleQuestions(settings, limit);
-    }
-
-    const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
-    const corpusByGid = this._corpusByGid(allGroups, settings);
-    const selectedVerses = Array.from(corpusByGid.values())
-      .filter(v => window.Scope.inSelection(v, settings.selection, map));
-    const phrases = new Map();
-
-    selectedVerses.forEach(v => {
-      const words = v.text.split(/\s+/).filter(Boolean);
-      const seen = new Set();
-      for (let len = Math.min(5, words.length); len >= 2; len--) {
-        for (let i = 0; i <= words.length - len; i++) {
-          const text = words.slice(i, i + len).join(" ");
-          const key = this._cleanText(text);
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          if (!phrases.has(key)) phrases.set(key, { text, wordCount: len, gids: new Set(), endGids: new Set() });
-          const p = phrases.get(key);
-          p.gids.add(v.gid);
-          if (i + len === words.length) p.endGids.add(v.gid);
-        }
-      }
-    });
-
-    const groupPairs = this._groupPairSet(allGroups);
-    const cleanVerseByGid = new Map(selectedVerses.map(v => [v.gid, this._cleanText(v.text)]));
-    const byLocations = new Map();
-    Array.from(phrases.entries()).forEach(([key, p]) => {
-      const matchedGids = selectedVerses
-        .filter(v => cleanVerseByGid.get(v.gid).includes(key))
-        .map(v => v.gid);
-      if (matchedGids.length < 2) return;
-      const candidate = {
-        ...p,
-        gids: new Set(matchedGids),
-        endGids: new Set(matchedGids.filter(g => cleanVerseByGid.get(g).endsWith(key)))
-      };
-      const locKey = matchedGids.sort((a, b) => a - b).join(',');
-      const current = byLocations.get(locKey);
-      const score = this._scoreSharedCandidate(candidate, groupPairs);
-      if (score <= 0) return;
-      if (!current || score > current.score) byLocations.set(locKey, { key, p: candidate, score });
-    });
-    const candidates = Array.from(byLocations.values())
-      .map(x => ({ ...x, r: Math.random() * 2 }))
-      .sort((a, b) => (b.score + b.r) - (a.score + a.r));
-
-    const out = [];
-    for (const { key, p } of candidates) {
-      const q = this._buildSharedPartQuestion('corpus:' + key, p.text, Array.from(p.gids), corpusByGid, settings);
-      if (q) out.push(q);
-      if (out.length >= limit) break;
-    }
-    return out;
+    return index ? index.sampleQuestions(settings, limit) : [];
   },
 
   /**
@@ -449,72 +247,48 @@ window.DiffEngine = {
       quranTextFormat: 'uthmani', selection: { mode: 'all' }, pool: 'all', optionCap: 3
     }, settings);
 
-    if (!group || !group.verses || group.verses.length < 2) return null;
-
-    const map = (window.pageJuzMap && window.pageJuzMap.byGid) || {};
-    const cleanText = (text) => text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").trim();
-    const formatVerseText = (v) =>
-      (settings.quranTextFormat === 'uthmani' && window.quranText && window.quranText[v.gid] && window.quranText[v.gid].uthmani)
-        ? window.quranText[v.gid].uthmani : v.text;
-
-    const inSelection = (v) => window.Scope.inSelection(v, settings.selection, map);
-    const eligibleForPool = (v) => window.Scope.eligibleDistractor(v, settings.pool, settings.selection, map);
-    const verses = group.verses
-      .map(v => ({ ...v, text: formatVerseText(v) }))
-      .filter(v => inSelection(v) || eligibleForPool(v));
-    if (verses.length < 2 || !verses.some(inSelection)) return null;
-
-    const corpusByGid = new Map();
-    if (window.quranText) {
-      Object.entries(window.quranText).forEach(([gid, v]) => {
-        const g = parseInt(gid);
-        corpusByGid.set(g, { ...v, gid: g, text: formatVerseText({ ...v, gid: g }) });
-      });
-    }
-    (allGroups || []).forEach(g => (g.verses || []).forEach(v => {
-      if (!corpusByGid.has(v.gid)) corpusByGid.set(v.gid, { ...v, text: formatVerseText(v) });
-    }));
-
-    const phrases = new Map();
-    verses.forEach(v => {
-      const words = v.text.split(/\s+/).filter(Boolean);
-      const seen = new Set();
-      for (let len = Math.min(5, words.length); len >= 1; len--) {
-        for (let i = 0; i <= words.length - len; i++) {
-          const text = words.slice(i, i + len).join(" ");
-          const key = cleanText(text);
-          if (!key || seen.has(key)) continue;
-          seen.add(key);
-          if (!phrases.has(key)) phrases.set(key, { text, wordCount: len, gids: new Set(), verses: [] });
-          const p = phrases.get(key);
-          p.gids.add(v.gid);
-          p.verses.push(v);
-        }
-      }
-    });
-
-    const candidates = Array.from(phrases.values())
-      .filter(p => p.gids.size >= 2 && p.verses.some(inSelection));
-    if (candidates.length === 0) return null;
-
-    const notAll = candidates.filter(p => p.gids.size < verses.length);
-    const picked = (notAll.length ? notAll : candidates)
-      .map(p => ({ p, r: Math.random() }))
-      .sort((a, b) => b.p.wordCount - a.p.wordCount || a.p.gids.size - b.p.gids.size || a.r - b.r)[0].p;
-
-    const matchKey = cleanText(picked.text);
-    const corpusMatches = Array.from(corpusByGid.values())
-      .filter(v => inSelection(v) && cleanText(v.text).includes(matchKey));
-    if (corpusMatches.length < 2) return null;
-
-    const correctLocations = corpusMatches.map(v => v.gid);
-    return this._buildSharedPartQuestion(group.id, picked.text, correctLocations, corpusByGid, settings);
+    const index = this._getSharedPartIndex(allGroups);
+    return index ? index.buildGroupQuestion(group, settings) : null;
   },
 
   _generateQuestionByType: function (type, group, allGroups, settings) {
     return type === 'sharedPart'
       ? this.generateSharedPartQuestion(group, allGroups, settings)
       : this.generateQuestion(group, allGroups, settings);
+  },
+
+  _mixedCompletionQuestionBank: function (targetGroups, allGroups, settings, needed) {
+    const groupIds = (targetGroups || []).map(g => g.id).sort((a, b) => a - b).join(',');
+    const key = [
+      settings.quranTextFormat || 'uthmani',
+      settings.gapMode || 'full',
+      JSON.stringify(settings.selection || { mode: 'all' }),
+      settings.pool || 'all',
+      settings.optionMin || '',
+      settings.optionCap || '',
+      settings.distractorStrategy || 'adaptive',
+      groupIds
+    ].join('|');
+    if (!this._mixedCompletionBankCache ||
+      this._mixedCompletionBankCache.allGroups !== allGroups ||
+      this._mixedCompletionBankCache.quranText !== window.quranText ||
+      this._mixedCompletionBankCache.pageJuzMap !== window.pageJuzMap) {
+      this._mixedCompletionBankCache = {
+        allGroups,
+        quranText: window.quranText,
+        pageJuzMap: window.pageJuzMap,
+        banks: new Map()
+      };
+    }
+    const banks = this._mixedCompletionBankCache.banks;
+    if (!banks.has(key)) banks.set(key, { questions: [], next: 0 });
+    const bank = banks.get(key);
+    const target = Math.min(targetGroups.length, Math.max(needed || 0, bank.questions.length));
+    while (bank.questions.length < target && bank.next < targetGroups.length) {
+      const q = this.generateQuestion(targetGroups[bank.next++], allGroups, settings);
+      if (q) bank.questions.push(q);
+    }
+    return bank.questions;
   },
 
   generateMixedQuestions: function (targetGroups, allGroups, settings = {}, length = 10) {
@@ -533,6 +307,8 @@ window.DiffEngine = {
       completion: Object.assign({}, settings, { quizType: 'completion' }),
       sharedPart: Object.assign({}, settings, { quizType: 'sharedPart' })
     };
+    const completionBank = shuffle(this._mixedCompletionQuestionBank(groups, allGroups, settingsByType.completion, length));
+    let completionBankCursor = 0;
     let sharedCursor = 0;
     let shuffledGroups = 0;
     const used = new Set();
@@ -557,7 +333,30 @@ window.DiffEngine = {
       return null;
     };
 
+    const cloneQuestion = (q) => ({
+      ...q,
+      options: shuffle(q.options),
+      beforeVerses: q.beforeVerses ? [...q.beforeVerses] : [],
+      afterVerses: q.afterVerses ? [...q.afterVerses] : []
+    });
+
+    const nextCachedCompletion = () => {
+      if (!completionBank) return null;
+      while (completionBankCursor < completionBank.length) {
+        const q = completionBank[completionBankCursor++];
+        const key = 'completion:' + q.id;
+        if (used.has(key)) continue;
+        used.add(key);
+        return cloneQuestion(q);
+      }
+      return null;
+    };
+
     const nextGroupQuestion = (type) => {
+      if (type === 'completion') {
+        const cached = nextCachedCompletion();
+        if (cached) return cached;
+      }
       while (groupCursor[type] < groups.length) {
         const g = groupAt(groupCursor[type]++);
         const key = type + ':' + g.id;
@@ -589,7 +388,7 @@ window.DiffEngine = {
       const out = [];
       while (out.length < length) {
         const type = Math.random() < 0.5 ? 'completion' : 'sharedPart';
-        const q = take(type, 1)[0] || take(type === 'completion' ? 'sharedPart' : 'completion', 1)[0];
+        const q = takeOne(type) || takeOne(type === 'completion' ? 'sharedPart' : 'completion');
         if (!q) break;
         out.push(q);
       }
