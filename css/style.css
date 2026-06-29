@@ -1,8 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;700;800&family=Amiri:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;700;800&display=swap');
+
+@font-face {
+  font-family: 'Rasikhun Quran';
+  src: url('../assets/fonts/AmiriQuran.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --font-sans: 'Cairo', sans-serif;
-  --font-quran: 'Amiri', serif;
+  --font-quran: 'Rasikhun Quran', 'Amiri Quran', 'Amiri', serif;
 }
 
 [v-cloak] {
@@ -16,6 +24,8 @@ body {
 
 .quran-text {
   font-family: var(--font-quran);
+  font-weight: 400;
+  font-synthesis: none;
   line-height: 2.5 !important;
   padding-top: 0.3em;
   padding-bottom: 0.3em;
