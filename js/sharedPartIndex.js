@@ -124,6 +124,9 @@
 
       verses.forEach(v => {
         const words = v.text.split(/\s+/).filter(Boolean);
+        v.opening2 = words.slice(0, 2).join(" ");
+        v.opening3 = words.slice(0, 3).join(" ");
+        v.wordCount = words.length;
         const plainWords = new Array(words.length);
         const cleanWords = new Array(words.length);
         for (let i = 0; i < words.length; i++) {
@@ -321,18 +324,38 @@
       const byGid = (corpusByGid && typeof corpusByGid.get === 'function' && typeof corpusByGid.has === 'function')
         ? corpusByGid
         : new Map(Array.from(corpusByGid.values()).map(v => [v.gid, v]));
-      const optionFrom = (locations) => {
-        const ordered = Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
+      const orderedLocations = (locations) =>
+        Array.from(new Set(locations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
+      const openingOf = (gid, count) => {
+        const v = byGid.get(gid);
+        return count === 2 && v.opening2 !== undefined
+          ? v.opening2
+          : count === 3 && v.opening3 !== undefined
+            ? v.opening3
+            : v.text.split(/\s+/).filter(Boolean).slice(0, count).join(" ");
+      };
+      const snippetOf = (gid, count) => {
+        const v = byGid.get(gid);
+        const words = v.wordCount === undefined ? v.text.split(/\s+/).filter(Boolean) : null;
+        const text = openingOf(gid, count);
+        const truncated = v.wordCount === undefined ? words.length > count : v.wordCount > count;
+        return '"' + text + (truncated ? '...' : '') + '"';
+      };
+      const optionFrom = (ordered, expandedOpenings) => {
         const refs = ordered.map(g => refOf(byGid.get(g)));
-        return { text: refs.join(" • "), locations: ordered, refs: refs };
+        const text = settings.sharedPartOptionDisplay === 'refs' ? refs.join(" • ") : ordered.map(g => {
+          const opening = openingOf(g, 2);
+          return snippetOf(g, expandedOpenings.has(opening) ? 3 : 2);
+        }).join(" • ");
+        return { text: text, locations: ordered, refs: refs };
       };
 
-      correctLocations = Array.from(new Set(correctLocations)).filter(g => byGid.has(g)).sort((a, b) => a - b);
+      correctLocations = orderedLocations(correctLocations);
       if (correctLocations.length < 2) return null;
 
       const wrongSets = [];
       const addWrong = (locations) => {
-        const ordered = optionFrom(locations).locations;
+        const ordered = orderedLocations(locations);
         if (!ordered.length || sameSet(ordered, correctLocations) || wrongSets.some(s => sameSet(s, ordered))) return;
         wrongSets.push(ordered);
       };
@@ -353,10 +376,17 @@
         addWrong(sample(fakePoolGids, size));
       }
 
-      const options = shuffle([
-        optionFrom(correctLocations),
-        ...shuffle(wrongSets).slice(0, limit - 1).map(optionFrom)
-      ]);
+      const optionSets = [correctLocations, ...shuffle(wrongSets).slice(0, limit - 1)];
+      const openingGids = new Map();
+      const expandedOpenings = new Set();
+      optionSets.forEach(locations => locations.forEach(g => {
+        const opening = openingOf(g, 2);
+        if (!opening) return;
+        const seenGid = openingGids.get(opening);
+        if (seenGid === undefined) openingGids.set(opening, g);
+        else if (seenGid !== g) expandedOpenings.add(opening);
+      }));
+      const options = shuffle(optionSets.map(locations => optionFrom(locations, expandedOpenings)));
       if (options.length < 2) return null;
 
       return {
@@ -445,7 +475,8 @@
       selectionKey(settings.selection),
       settings.pool || 'all',
       settings.optionMin || '',
-      settings.optionCap || ''
+      settings.optionCap || '',
+      settings.sharedPartOptionDisplay || 'openings'
     ].join('|');
 
     const questionBank = (settings, needed) => {

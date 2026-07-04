@@ -180,6 +180,50 @@ const directBaqarah68Question = withSeed(20240629, () => directSharedIndex.build
 assert(!!directBaqarah68Question, 'SharedPartIndex should build a group-backed shared question directly');
 assertSharedQuestionMatchesCorpus(directBaqarah68Question, sharedRealSettings, 'direct SharedPartIndex group 308');
 
+const openingIndex = window.SharedPartIndex.create({
+  groups: [],
+  quranText: {
+    1: { sura_id: 1, sura_name: 'الفاتحة', aya_id: 2, text: 'ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِینَ', uthmani: 'ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِینَ' },
+    2: { sura_id: 6, sura_name: 'الأنعام', aya_id: 1, text: 'ٱلۡحَمۡدُ لِلَّهِ ٱلَّذِي خَلَقَ ٱلسَّمَٰوَٰتِ', uthmani: 'ٱلۡحَمۡدُ لِلَّهِ ٱلَّذِي خَلَقَ ٱلسَّمَٰوَٰتِ' },
+    3: { sura_id: 61, sura_name: 'الصف', aya_id: 1, text: 'سَبَّحَ لِلَّهِ مَا فِي ٱلسَّمَٰوَٰتِ', uthmani: 'سَبَّحَ لِلَّهِ مَا فِي ٱلسَّمَٰوَٰتِ' }
+  },
+  pageJuzMap: { byGid: { 1: { page: 1, juz: 1 }, 2: { page: 2, juz: 1 }, 3: { page: 3, juz: 1 } } }
+});
+const openingQuestion = withSeed(8, () => openingIndex.buildQuestion({
+  id: 'opening-display',
+  sharedText: 'لِلَّهِ',
+  correctLocations: [1, 3],
+  score: 1
+}, {
+  quranTextFormat: 'uthmani',
+  selection: { mode: 'all' },
+  pool: 'all',
+  optionMin: 7,
+  optionCap: 7
+}));
+assert(!!openingQuestion, 'shared-part opening display fixture should produce a question');
+const openingOptionText = openingQuestion ? openingQuestion.options.map(o => o.text).join(' | ') : '';
+assert(openingOptionText.includes('"ٱلۡحَمۡدُ لِلَّهِ رَبِّ..."'), 'shared-part options should quote colliding truncated verse openings and expand them to three words');
+assert(openingOptionText.includes('"ٱلۡحَمۡدُ لِلَّهِ ٱلَّذِي..."'), 'shared-part options should quote every colliding truncated opening, not just the correct one');
+assert(openingOptionText.includes('"سَبَّحَ لِلَّهِ..."'), 'shared-part options should quote non-colliding truncated verse openings at two words');
+assert(!openingOptionText.includes('سَبَّحَ لِلَّهِ مَا'), 'shared-part options should keep non-colliding verse openings at two words');
+assert(!openingOptionText.includes('الفاتحة 2'), 'shared-part options should show verse openings instead of verse references');
+const refQuestion = withSeed(8, () => openingIndex.buildQuestion({
+  id: 'ref-display',
+  sharedText: 'لِلَّهِ',
+  correctLocations: [1, 3],
+  score: 1
+}, {
+  quranTextFormat: 'uthmani',
+  selection: { mode: 'all' },
+  pool: 'all',
+  optionMin: 7,
+  optionCap: 7,
+  sharedPartOptionDisplay: 'refs'
+}));
+const refOptionText = refQuestion ? refQuestion.options.map(o => o.text).join(' | ') : '';
+assert(refOptionText.includes('الفاتحة 2'), 'shared-part refs display should still be available from settings');
+
 const savedSharedPartIndex = window.SharedPartIndex;
 window.SharedPartIndex = null;
 DE._sharedPartIndexCache = null;
