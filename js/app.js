@@ -29,6 +29,7 @@ createApp({
     const gapMode = ref('full');
     const contextCountBefore = ref(1);
     const contextCountAfter = ref(1);
+    const sharedPartOptionDisplay = ref('openings'); // openings | refs
 
     // المجال المختار (Selection) — راجع CONTEXT.md
     const selectionMode = ref('all');            // all | surahs | juz | pages
@@ -151,6 +152,7 @@ createApp({
         pool: overridePool || pool.value,
         optionMin: 3,
         optionCap: 5,
+        sharedPartOptionDisplay: sharedPartOptionDisplay.value,
         distractorStrategy: distractorStrategy.value,
         quizType: quizType.value,
         mixedStrategy: mixedStrategy.value
@@ -175,7 +177,7 @@ createApp({
         sharedPartWarmTimer = { type: 'timeout', id: setTimeout(run, 0) };
       }
     };
-    watch([quranTextFormat, selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, quizLength], scheduleSharedPartWarm, { deep: true });
+    watch([quranTextFormat, sharedPartOptionDisplay, selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, quizLength], scheduleSharedPartWarm, { deep: true });
 
     // توليد الأسئلة لمجموعات الهدف (مع تجاوز pool اختياري لملء النطاق المحدود)
     const generateAll = (overridePool) => {
@@ -291,6 +293,7 @@ createApp({
       totalMutashabihat, totalVerses, totalPages, availableSurahs, currentQuestion,
       allJuz, selectedJuzSummary, selectionSummary,
       showAdvancedSettings, quranTextFormat, gapMode, contextCountBefore, contextCountAfter,
+      sharedPartOptionDisplay,
       selectionMode, selectedSurahs, selectedJuz, pageFrom, pageTo, pool, distractorStrategy,
       starvedDialog,
       isCorrectOption, isSelectedOption,
