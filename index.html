@@ -9,12 +9,10 @@
   <link rel="stylesheet" href="css/tailwind.css">
   <!-- Custom CSS Design System -->
   <link rel="stylesheet" href="css/style.css">
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Canvas Confetti CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <!-- Vue 3 production CDN -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Canvas Confetti (vendored, pinned 1.6.0) -->
+  <script src="vendor/canvas-confetti.min.js"></script>
+  <!-- Vue 3 production build (vendored, pinned 3.5.39) -->
+  <script src="vendor/vue.global.prod.js"></script>
 </head>
 <body class="animated-bg text-slate-800 dark:text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden antialiased">
 
@@ -602,11 +600,5 @@
   <script src="js/diffEngine.js"></script>
   <script src="js/sharedPartIndex.js"></script>
   <script src="js/app.js"></script>
-  <script>
-    // تهيئة أيقونات Lucide
-    document.addEventListener("DOMContentLoaded", () => {
-      lucide.createIcons();
-    });
-  </script>
 </body>
 </html>
