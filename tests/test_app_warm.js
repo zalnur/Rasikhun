@@ -34,7 +34,9 @@ global.window = {
 global.requestIdleCallback = window.requestIdleCallback;
 global.cancelIdleCallback = window.cancelIdleCallback;
 global.localStorage = { getItem() { return null; }, setItem() {} };
-global.document = { documentElement: { classList: { toggle() {} } } };
+// document mock supports both classList.toggle (dark mode) and
+// setAttribute('data-theme') (visual theme). See app.js applyTheme/setTheme.
+global.document = { documentElement: { classList: { toggle() {} }, setAttribute() {} } };
 global.alert = () => {};
 
 global.Vue = {

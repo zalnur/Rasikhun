@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>راسخون · راسخون</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  font-family:var(--font-ui);
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.6;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  background-image:var(--pattern,none);
+  background-size:var(--pattern-size,auto);
+  transition:background-color .35s ease,color .35s ease;
+}
+button{font-family:inherit;cursor:pointer}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.icon-btn:focus-visible,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:38rem;margin:0 auto;padding:1.4rem 1.25rem 3rem;display:flex;flex-direction:column;gap:1rem}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.brand{display:flex;align-items:center;gap:.7rem}
+.logo{width:2.4rem;height:2.4rem;color:var(--accent);flex:none}
+.brand-text{display:flex;flex-direction:column;line-height:1.25}
+.brand-text strong{font-family:var(--font-display);font-size:1.35rem;font-weight:700;letter-spacing:.01em}
+.brand-text small{font-size:.74rem;color:var(--muted)}
+.topbar-actions{display:flex;gap:.4rem}
+.icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:2.4rem;height:2.4rem;border-radius:var(--radius);
+  background:var(--surface);border:1px solid var(--border);color:var(--ink-soft);
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease;
+}
+.icon-btn svg{width:1.25rem;height:1.25rem}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink);border-color:var(--accent-line)}
+
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chip{
+  font-size:.78rem;padding:.32rem .7rem;border-radius:999px;
+  background:var(--surface);border:1px solid var(--border);color:var(--ink-soft);
+}
+.chip b{font-weight:600;color:var(--ink)}
+.chip.ghost{background:transparent;color:var(--accent);border-color:var(--accent-line)}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:1.5rem 1.5rem 1.6rem;box-shadow:var(--shadow);
+}
+.qmeta{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:.4rem}
+.qcount{font-size:.78rem;font-weight:600;color:var(--accent);letter-spacing:.02em}
+.qloc{font-size:.78rem;color:var(--muted)}
+.prompt{font-size:1.02rem;font-weight:600;margin:.2rem 0 1.1rem;color:var(--ink)}
+
+.verse{
+  font-family:var(--font-quran);
+  font-size:1.7rem;line-height:2.5;text-align:justify;
+  color:var(--ink);margin:0 0 1.4rem;padding:1.1rem 1.1rem;
+  background:var(--verse-bg);border-radius:var(--radius);
+  border:1px solid var(--verse-border);
+}
+.gap{
+  display:inline-block;min-width:5.5em;text-align:center;
+  color:transparent;background:var(--gap-bg);
+  border-radius:.35em;padding:0 .25em;margin:0 .15em;
+  box-shadow:var(--gap-shadow);
+}
+.endmark{color:var(--accent);font-size:1.4em;margin-inline-start:.2em}
+
+.options{display:flex;flex-direction:column;gap:.6rem}
+.opt{
+  display:flex;align-items:center;gap:.85rem;
+  text-align:start;padding:.85rem 1rem;
+  background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius);
+  color:var(--ink);transition:transform .15s ease,border-color .2s ease,background-color .2s ease;
+}
+.opt:hover{border-color:var(--accent-line);transform:translateY(-1px)}
+.opt-key{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1.9rem;height:1.9rem;flex:none;border-radius:999px;
+  background:var(--surface);border:1px solid var(--border);
+  font-size:.85rem;font-weight:700;color:var(--ink-soft);font-family:var(--font-ui);
+}
+.opt-text{font-family:var(--font-quran);font-size:1.45rem;letter-spacing:.01em}
+.opt-check{width:1.5rem;height:1.5rem;margin-inline-start:auto;flex:none;background:var(--good);color:var(--on-good);border-radius:999px;padding:.28rem}
+.opt.correct{
+  background:var(--good-soft);border-color:var(--good);color:var(--good-ink);
+}
+.opt.correct .opt-key{background:var(--good);border-color:var(--good);color:var(--on-good)}
+
+.feedback{
+  margin-top:1.2rem;padding:1rem 1.1rem;border-radius:var(--radius);
+  background:var(--accent-soft);border:1px solid var(--accent-line);
+}
+.fb-head{display:flex;align-items:center;gap:.45rem;font-size:.78rem;font-weight:700;color:var(--accent);margin-bottom:.55rem}
+.fb-head svg{width:1.05rem;height:1.05rem}
+.fb-verse{font-family:var(--font-quran);font-size:1.35rem;line-height:2.2;margin:.2rem 0;color:var(--ink)}
+.diff{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:1.5px;text-underline-offset:4px}
+.fb-loc{font-size:.76rem;color:var(--muted);margin:.1rem 0 .5rem}
+.fb-note{font-size:.84rem;color:var(--ink-soft);margin:0}
+
+.dots{display:flex;gap:.45rem;justify-content:center;margin-top:.5rem}
+.dot{width:.5rem;height:.5rem;border-radius:999px;background:var(--faint)}
+.dot.done{background:var(--accent)}
+.dot.active{background:var(--accent);transform:scale(1.5)}
+
+.signature{text-align:center;font-size:.74rem;color:var(--muted);margin-top:.2rem}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important}
+}
+
+
+:root{
+  --font-ui:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --font-display:"Reem Kufi","IBM Plex Sans Arabic",sans-serif;
+  --font-quran:"Amiri","Scheherazade New",serif;
+  --bg:#f6f1e7; --surface:#fbf7ee; --surface-2:#f1e9d8;
+  --ink:#1d2b28; --ink-soft:#4a5853; --muted:#646d68; --faint:#d8cdb6;
+  --border:#e6dcc6; --accent-line:#cfe0d8;
+  --accent:#0f5147; --accent-soft:#e6eeea;
+  --good:#2f6f3f; --good-ink:#1c3f26; --good-soft:#e8f1e6; --on-good:#fff;
+  --verse-bg:#fdfaf3; --verse-border:#ece1ca;
+  --gap-bg:#0f5147;
+  --radius:.65rem; --radius-lg:.9rem;
+  --shadow:0 1px 2px rgba(29,43,40,.05),0 14px 30px -24px rgba(29,43,40,.4);
+  --pattern:repeating-linear-gradient(0deg,transparent 0 24px,rgba(15,81,71,.022) 24px 25px),
+            repeating-linear-gradient(90deg,transparent 0 24px,rgba(15,81,71,.022) 24px 25px);
+}
+.dark{
+  --bg:#131a18; --surface:#1b2321; --surface-2:#232c29;
+  --ink:#ece6d7; --ink-soft:#c0bcae; --muted:#8a938c; --faint:#2c3432;
+  --border:#2b3431; --accent-line:#2f443d;
+  --accent:#5fb3a4; --accent-soft:rgba(95,179,164,.12);
+  --good:#7fc488; --good-ink:#bff0c4; --good-soft:rgba(127,196,136,.13); --on-good:#0a1f12;
+  --verse-bg:#161d1b; --verse-border:#27302d;
+  --gap-bg:#5fb3a4;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 30px -22px rgba(0,0,0,.7);
+  --pattern:repeating-linear-gradient(0deg,transparent 0 24px,rgba(95,179,164,.03) 24px 25px),
+            repeating-linear-gradient(90deg,transparent 0 24px,rgba(95,179,164,.03) 24px 25px);
+}
+/* Nur's monumental Reem Kufi on the wordmark and the question prompt. */
+.brand-text strong{font-size:1.45rem;letter-spacing:.015em}
+.prompt{font-family:var(--font-display);font-size:1.16rem;font-weight:600}
+/* Mizan's measured balance: tighter corners, more breathing, even rhythm. */
+.app{gap:1.1rem}
+.card{padding:1.75rem 1.75rem 1.85rem}
+.qmeta{margin-bottom:.5rem}
+.verse{font-size:1.78rem;padding:1.4rem 1.4rem}
+.options{gap:.6rem}
+.opt{padding:.9rem 1.05rem}
+.opt-text{font-size:1.5rem}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+    <rect x="10" y="10" width="28" height="28" rx="2" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="10" y="10" width="28" height="28" rx="2" stroke="currentColor" stroke-width="1.6" transform="rotate(45 24 24)"/>
+  </svg>
+      <span class="brand-text">
+        <strong>راسخون</strong>
+        <small>اختبار متشابهات القرآن</small>
+      </span>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" type="button" aria-label="الإعدادات"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button class="icon-btn theme-toggle" type="button" aria-label="تبديل الوضع الليلي"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+  </header>
+
+  <div class="chips">
+    <span class="chip"><b>السورة:</b> الأعراف</span>
+    <span class="chip"><b>الأسئلة:</b> ٢٠</span>
+    <span class="chip"><b>الرسم:</b> عثماني</span>
+    <span class="chip ghost">سياق الآيات</span>
+  </div>
+
+  <main class="card">
+    <div class="qmeta">
+      <span class="qcount">السؤال ٤ من ٢٠</span>
+      <span class="qloc">الأعراف · الآية ٤٥</span>
+    </div>
+
+    <h2 class="prompt">ما التكملة الصحيحة لختام الآية في الموضع المميَّز؟</h2>
+
+    <p class="verse" dir="rtl">
+      الَّذِينَ يَصُدُّونَ عَن سَبِيلِ اللَّهِ وَيَبْغُونَهَا عِوَجًا وَهُم بِالْآخِرَةِ
+      <mark class="gap" title="الموضع المطلوب"><span aria-hidden="true">······</span><span class="sr-only">الموضع الناقص</span></mark>
+      <span class="endmark" aria-hidden="true">۞</span>
+    </p>
+
+    <div class="options" role="list">
+      <button class="opt correct" type="button" role="listitem" aria-pressed="true">
+        <span class="opt-key">أ</span>
+        <span class="opt-text">كَافِرُونَ</span>
+        <svg class="opt-check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="opt" type="button" role="listitem" aria-pressed="false">
+        <span class="opt-key">ب</span>
+        <span class="opt-text">هُمْ كَافِرُونَ</span>
+      </button>
+      <button class="opt" type="button" role="listitem" aria-pressed="false">
+        <span class="opt-key">ج</span>
+        <span class="opt-text">هُمْ خَاسِرُونَ</span>
+      </button>
+    </div>
+
+    <div class="feedback">
+      <div class="fb-head"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>المتشابه المقابل</span></div>
+      <p class="fb-verse" dir="rtl">
+        الَّذِينَ يَصُدُّونَ عَن سَبِيلِ اللَّهِ وَيَبْغُونَهَا عِوَجًا وَهُم بِالْآخِرَةِ
+        <u class="diff">هُمْ كَافِرُونَ</u>
+      </p>
+      <p class="fb-loc">هود · الآية ١٩</p>
+      <p class="fb-note">الفرق: «هم» تثبت في هود وتسقط في الأعراف. لاحظ موضعها.</p>
+    </div>
+  </main>
+
+  <footer class="dots" role="progressbar" aria-valuenow="4" aria-valuemin="0" aria-valuemax="20" aria-label="التقدّم في الاختبار">
+    <span class="dot done" aria-hidden="true"></span>
+    <span class="dot done" aria-hidden="true"></span>
+    <span class="dot done" aria-hidden="true"></span>
+    <span class="dot active" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="sr-only">أُجيب ٤ من ٢٠ سؤالاً</span>
+  </footer>
+
+  <p class="signature">نموذج تصميم: المختار · دفء السكون وخط النور وتوازن الميزان</p>
+</div>
+<script>
+  const t=document.querySelector('.theme-toggle');
+  const set=m=>{document.documentElement.classList.toggle('dark',m==='dark');t.innerHTML=m==='dark'?'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>':'<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';try{localStorage.setItem('rsk-theme',m)}catch(e){}};
+  let init='light';try{init=localStorage.getItem('rsk-theme')||'light'}catch(e){}
+  set(init);t.addEventListener('click',()=>set(document.documentElement.classList.contains('dark')?'light':'dark'));
+</script>
+</body>
+</html>

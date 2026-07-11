@@ -12,6 +12,22 @@ createApp({
     const currentScreen = ref("welcome");
     const darkMode = ref(true);
 
+    // النمط البصري (theme): مستقل عن الوضع الليلي/النهاري.
+    // القيمة الافتراضية سُكون؛ تُطبَّق قبل الطلاء عبر سكربت inline في index.html
+    // ثم تُزامَن هنا مع حالة Vue.
+    const theme = ref('sukun');
+    const showThemePicker = ref(false);
+    const themes = [
+      { key: 'sukun',  name: 'سُكون',   note: 'الافتراضي', swatch: ['#f6f1e7', '#fbf7ee', '#0f5147', '#2f6f3f'] },
+      { key: 'glass',  name: 'الزجاجي', note: 'الكلاسيكي', swatch: ['#f1f5f9', '#ffffff', '#22c55e', '#16a34a'] },
+      { key: 'rasikhun', name: 'راسخون',  note: 'موحَّد',   swatch: ['#f6f1e7', '#fbf7ee', '#0f5147', '#2f6f3f'] },
+      { key: 'nur',    name: 'النور',   note: 'نحاسي',  swatch: ['#f3f6fb', '#fcfdfe', '#1b2a4a', '#9a4621'] },
+      { key: 'mizan',  name: 'الميزان', note: 'الدقّة',  swatch: ['#f6f7f9', '#ffffff', '#0e7d6a', '#1a7f4e'] },
+      { key: 'nizam',  name: 'النظام',  note: 'السجل',   swatch: ['#eeeae0', '#faf7f0', '#1a1714', '#7c1f2b'] },
+      { key: 'tin',    name: 'الطين',   note: 'أندلسي', swatch: ['#e7d8c4', '#f1e6d4', '#33271c', '#a64f2c'] },
+      { key: 'layl',   name: 'الليل',   note: 'الصفحة المضيئة', swatch: ['#0e1411', '#161d19', '#f3ead7', '#d9a441'] }
+    ];
+
     // إعدادات الاختبار
     const quizLength = ref(10);
     const quizType = ref('completion'); // completion | sharedPart | mixed
@@ -123,6 +139,8 @@ createApp({
         isLoaded.value = true;
         if (localStorage.getItem("theme") === "light") darkMode.value = false;
         applyTheme();
+        // زامِن نمط Vue مع ما طبّقه سكربت ما قبل الطلاء
+        setTheme(localStorage.getItem('rasikhun-theme') || 'sukun');
         scheduleSharedPartWarm();
       } catch (e) {
         console.error("فشل تحميل بيانات المتشابهات:", e);
@@ -135,6 +153,21 @@ createApp({
       localStorage.setItem("theme", darkMode.value ? "dark" : "light");
     };
     const toggleDarkMode = () => { darkMode.value = !darkMode.value; applyTheme(); };
+
+    // تبديل النمط البصري: يضبط سمة data-theme على <html> ويحفظها
+    const setTheme = (t) => {
+      theme.value = t;
+      document.documentElement.setAttribute('data-theme', t);
+      try { localStorage.setItem('rasikhun-theme', t); } catch (e) {}
+    };
+    const toggleThemePicker = () => { showThemePicker.value = !showThemePicker.value; };
+    // "قريباً" themes have no CSS block yet — never apply or persist them.
+    const pickTheme = (key) => {
+      const t = themes.find(x => x.key === key);
+      if (!t || t.soon) return;
+      setTheme(key);
+      showThemePicker.value = false;
+    };
     const fillToLength = (qs) => {
       const out = [...qs];
       while (out.length > 0 && out.length < quizLength.value) out.push(qs[(out.length - qs.length) % qs.length]);
@@ -289,6 +322,7 @@ createApp({
 
     return {
       isLoaded, currentScreen, darkMode,
+      theme, themes, showThemePicker, setTheme, toggleThemePicker, pickTheme,
       quizLength, quizType, mixedStrategy, questions, currentIndex, score, selectedAnswer, isAnswered, quizHistory,
       totalMutashabihat, totalVerses, totalPages, availableSurahs, currentQuestion,
       allJuz, selectedJuzSummary, selectionSummary,
