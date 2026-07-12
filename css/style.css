@@ -45,7 +45,7 @@
   --brand-900: 7 38 32;
   /* tight-UI structural tokens (ported from design mockups). Derived from brand/line → auto-track every theme + mode. */
   --radius: .9rem; --radius-lg: 1.25rem;
-  --accent: rgb(var(--brand-500)); --accent-soft: rgb(var(--brand-100)); --accent-line: rgb(var(--brand-200));
+  --accent: rgb(var(--brand-700)); --accent-soft: rgb(var(--brand-100)); --accent-line: rgb(var(--brand-200));
   --gap-bg: rgb(var(--brand-500)); --faint: rgb(var(--line));
   --bad: 220 38 38; --bad-soft: rgb(254 226 226); --bad-ink: 127 29 29; --on-bad: 255 255 255;
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 16px 32px -22px rgba(0,0,0,.3);
@@ -77,7 +77,7 @@
   --good: 127 196 136;
   --good-ink: 240 255 245;  /* raised from 191 240 196 so the tokenized correct-card passes AA on --good-soft in dark */
   /* tight-UI dark-mode soft accents (translucent over dark) + the wrong-answer (bad) family, mirroring --good */
-  --accent-soft: rgb(var(--brand-500) / .14); --accent-line: rgb(var(--brand-500) / .3);
+  --accent-soft: rgb(var(--brand-500) / .14); --accent-line: rgb(var(--brand-500) / .3); --accent: rgb(var(--brand-400));
   --bad: 248 113 113; --bad-soft: rgb(248 113 113 / .16); --bad-ink: 252 165 165; --on-bad: 10 31 18;
   --good-soft: 79 122 58;
   --on-good: 10 31 18;
@@ -104,8 +104,8 @@
   --brand-300: 134 239 172;
   --brand-400: 74 222 128;
   --brand-500: 34 197 94;
-  --brand-600: 22 163 74;
-  --brand-700: 21 128 61;
+  --brand-600: 21 128 61;
+  --brand-700: 22 101 52;
   --brand-800: 22 101 52;
   --brand-900: 20 83 45;
 
@@ -458,7 +458,7 @@ body {
 /* TIGHT UI — ported from design/sukun.html, scaled up ~20% (bigger type, */
 /* wider column, fills the screen). Token-driven → applies to every theme.   */
 /* ====================================================================== */
-.app{max-width:48rem;margin:0 auto;padding:2rem 1.5rem 2.5rem;display:flex;flex-direction:column;gap:1.25rem;flex-grow:1;justify-content:center;width:100%}
+.app{max-width:60rem;margin:0 auto;padding:2rem 1.5rem 2.5rem;display:flex;flex-direction:column;gap:1.25rem;flex-grow:1;justify-content:center;width:100%}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .brand{display:flex;align-items:center;gap:.85rem}
 .logo{width:2.8rem;height:2.8rem;color:var(--accent);flex:none}
@@ -482,7 +482,7 @@ body {
 .qloc{font-size:.95rem;color:rgb(var(--muted))}
 .prompt{font-size:1.25rem;font-weight:700;margin:.25rem 0 1.4rem;color:rgb(var(--ink));line-height:1.5}
 
-.verse{font-family:var(--font-quran);font-size:2.1rem;line-height:2.4;text-align:justify;color:rgb(var(--ink));margin:0 0 1.5rem;padding:1.5rem;background:rgb(var(--verse-bg));border-radius:var(--radius);border:1px solid rgb(var(--verse-border))}
+.verse{font-family:var(--font-quran);font-size:2.1rem;line-height:2.4;text-align:start;color:rgb(var(--ink));margin:0 0 1.5rem;padding:1.5rem;background:rgb(var(--verse-bg));border-radius:var(--radius);border:1px solid rgb(var(--verse-border))}
 .verse .ctx{display:block}
 .verse .ctx .vnum{font-size:.9rem;background:rgb(var(--surface-2));color:rgb(var(--muted));padding:.1rem .5rem;border-radius:.4rem;margin-inline-end:.5rem;font-family:var(--font-ui)}
 .gap{display:inline-block;min-width:5em;text-align:center;color:transparent;background:var(--gap-bg);border-radius:.35em;padding:0 .25em;margin:0 .15em;transition:background-color .2s,color .2s}
@@ -491,13 +491,13 @@ body {
 .gap.filled-no{background:var(--bad-soft);color:rgb(var(--bad-ink))}
 .endmark{color:var(--accent);font-size:1.4em;margin-inline-start:.2em}
 
-.options{display:flex;flex-direction:column;gap:.75rem}
-.opt{display:flex;align-items:center;gap:1rem;text-align:start;padding:1.1rem 1.3rem;background:rgb(var(--surface-2));border:1.5px solid rgb(var(--line));border-radius:var(--radius);color:rgb(var(--ink));transition:transform .15s,border-color .2s,background-color .2s;width:100%}
+.options{display:flex;flex-direction:column;gap:2rem}
+.opt{display:flex;align-items:center;gap:1rem;text-align:start;padding:2rem 1.5rem;background:rgb(var(--surface-2));border:1.5px solid rgb(var(--line));border-radius:var(--radius);color:rgb(var(--ink));transition:transform .15s,border-color .2s,background-color .2s;width:100%}
 .opt:hover:not(:disabled){border-color:var(--accent-line);transform:translateY(-1px)}
 .opt:disabled{cursor:default}
 .opt-key{display:inline-flex;align-items:center;justify-content:center;width:2.3rem;height:2.3rem;flex:none;border-radius:999px;background:rgb(var(--surface));border:1px solid rgb(var(--line));font-size:1rem;font-weight:700;color:rgb(var(--ink-soft));font-family:var(--font-ui)}
-.opt-body{display:flex;flex-direction:column;gap:.15rem;min-width:0;flex:1}
-.opt-text{font-family:var(--font-quran);font-size:1.8rem;letter-spacing:.01em;line-height:1.4}
+.opt-body{display:flex;flex-direction:column;gap:.5rem;min-width:0;flex:1}
+.opt-text{font-family:var(--font-quran);font-size:1.8rem;line-height:3}
 .opt-refs{font-size:.82rem;color:rgb(var(--muted));font-family:var(--font-ui)}
 .opt-check{width:1.8rem;height:1.8rem;margin-inline-start:auto;flex:none;background:rgb(var(--good));color:rgb(var(--on-good));border-radius:999px;padding:.3rem}
 .opt.correct{background:rgb(var(--good-soft));border-color:rgb(var(--good));color:rgb(var(--good-ink))}
@@ -541,3 +541,6 @@ body {
 .grade{font-family:var(--font-display);font-size:1.4rem;font-weight:700;color:var(--accent);margin-bottom:1.2rem;line-height:1.5}
 .scorebig{font-size:2.6rem;font-weight:800;color:var(--accent);font-family:var(--font-display)}
 .signature{text-align:center;font-size:.82rem;color:rgb(var(--muted));margin-top:.5rem;padding-bottom:1rem}
+
+/* small devices: scale all rem-based UI ~50% smaller (root font-size drives fonts, spacing, padding) */
+@media (max-width: 640px){ html{ font-size:65% } }
