@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>راسخون · طين</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.icon-btn:focus-visible,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+body{margin:0;font-family:var(--font-ui);background:var(--bg);color:var(--ink);min-height:100vh;
+  -webkit-font-smoothing:antialiased;transition:background-color .35s ease,color .35s ease}
+button{font-family:inherit;cursor:pointer;color:inherit}
+
+:root{
+  --bg:#e7d8c4; --surface:#f1e6d4; --surface-2:#e0cdb2;
+  --ink:#33271c; --ink-soft:#5e4b3a; --muted:#6a5a4b; --faint:#cdb79a;
+  --border:#dcc7a6; --accent-line:#e7c8b0;
+  --accent:#a64f2c; --accent-soft:#f1ddcf; --accent-ink:#fff;
+  --good:#6f7d33; --good-ink:#2c330f; --good-soft:#e6ead0; --good-solid:#5d6b28;
+  --verse-bg:#fbf3e3; --verse-border:#e2cea8;
+  --gap-bg:#a64f2c;
+  --radius:1rem; --radius-lg:1.35rem;
+  --shadow:0 1px 2px rgba(51,39,28,.06),0 14px 28px -22px rgba(92,56,28,.45);
+  --font-ui:"Tajawal",system-ui,sans-serif;
+  --font-display:"El Messiri","Tajawal",sans-serif;
+  --font-quran:"Amiri",serif;
+}
+.dark{
+  --bg:#241b13; --surface:#2e231a; --surface-2:#392b20;
+  --ink:#efe2cd; --ink-soft:#c9b599; --muted:#a18b73; --faint:#3a2c20;
+  --border:#3e2f22; --accent-line:#4a3322;
+  --accent:#cf7a4e; --accent-soft:rgba(207,122,78,.14);
+  --good:#a9b85e; --good-ink:#eef2cf; --good-soft:rgba(169,184,94,.14);
+  --verse-bg:#1f1810; --verse-border:#3a2c20;
+  --gap-bg:#cf7a4e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 30px -22px rgba(0,0,0,.7);
+}
+
+.app{max-width:38rem;margin:0 auto;padding:1.5rem 1.25rem 3rem;display:flex;flex-direction:column;gap:1.1rem}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.brand{display:flex;align-items:center;gap:.7rem}
+.logo{width:2.3rem;height:2.3rem;color:var(--accent);flex:none}
+.brand-text{display:flex;flex-direction:column;line-height:1.2}
+.brand-text strong{font-family:var(--font-display);font-size:1.6rem;font-weight:700;letter-spacing:.01em}
+.brand-text small{font-size:.73rem;color:var(--muted)}
+.actions{display:flex;gap:.4rem}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:2.3rem;height:2.3rem;border-radius:50%;
+  background:var(--surface);border:1px solid var(--border);color:var(--ink-soft);transition:color .2s,border-color .2s}
+.icon-btn svg{width:1.2rem;height:1.2rem}
+.icon-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+/* a single warm hairline rule under the header, zellij-quiet */
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--accent-line) 20%,var(--accent-line) 80%,transparent)}
+
+.chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.chip{font-size:.77rem;padding:.3rem .7rem;border-radius:.6rem;background:var(--surface);border:1px solid var(--border);color:var(--ink-soft)}
+.chip b{font-weight:700;color:var(--ink)}
+.chip.ghost{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.6rem;box-shadow:var(--shadow)}
+.qmeta{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:.45rem}
+.qcount{font-size:.78rem;font-weight:700;color:var(--accent);letter-spacing:.02em}
+.qloc{font-size:.76rem;color:var(--muted)}
+.prompt{font-family:var(--font-display);font-size:1.28rem;font-weight:600;margin:.15rem 0 1.15rem;color:var(--ink);line-height:1.5}
+
+.verse{font-family:var(--font-quran);font-size:1.78rem;line-height:2.5;text-align:justify;color:var(--ink);margin:0 0 1.35rem;
+  padding:1.25rem;background:var(--verse-bg);border:1px solid var(--verse-border);border-radius:var(--radius)}
+.gap{display:inline-block;min-width:5.5em;text-align:center;color:transparent;background:var(--gap-bg);border-radius:.4em;padding:0 .25em;margin:0 .15em}
+.endmark{color:var(--accent);font-size:1.35em;margin-inline-start:.15em}
+
+.options{display:flex;flex-direction:column;gap:.6rem}
+.opt{display:flex;align-items:center;gap:.85rem;text-align:start;padding:.9rem 1rem;
+  background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius);color:var(--ink);
+  transition:border-color .2s,background-color .2s,transform .15s}
+.opt:hover{border-color:var(--accent);transform:translateY(-1px)}
+.opt-key{display:inline-flex;align-items:center;justify-content:center;width:1.95rem;height:1.95rem;flex:none;border-radius:50%;
+  background:var(--surface);border:1px solid var(--border);font-family:var(--font-display);font-size:.9rem;font-weight:700;color:var(--ink-soft)}
+.opt-text{font-family:var(--font-quran);font-size:1.5rem}
+.opt-check{width:1.55rem;height:1.55rem;margin-inline-start:auto;flex:none;background:var(--good-solid);color:#fff;border-radius:50%;padding:.3rem}
+.opt.correct{background:var(--good-soft);border-color:var(--good);color:var(--good-ink)}
+.opt.correct .opt-key{background:var(--good-solid);border-color:var(--good-solid);color:#fff}
+
+.feedback{margin-top:1.2rem;padding:1rem 1.1rem;border-radius:var(--radius);background:var(--accent-soft);border:1px solid var(--accent-line)}
+.fb-head{display:flex;align-items:center;gap:.4rem;font-family:var(--font-display);font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:.5rem}
+.fb-head svg{width:1.1rem;height:1.1rem}
+.fb-verse{font-family:var(--font-quran);font-size:1.35rem;line-height:2.2;margin:.2rem 0;color:var(--ink)}
+.diff{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:1.5px;text-underline-offset:4px}
+.fb-loc{font-size:.75rem;color:var(--muted);margin:.1rem 0 .5rem}
+.fb-note{font-size:.84rem;color:var(--ink-soft);margin:0}
+
+.dots{display:flex;gap:.4rem;justify-content:center;margin-top:.4rem}
+.dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--faint)}
+.dot.done{background:var(--accent)}
+.dot.active{background:var(--accent);transform:scale(1.5)}
+.sig{text-align:center;font-size:.74rem;color:var(--muted);margin-top:.1rem}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 2.5c-3 0-5 1.6-5 4.2V14c0 2.2 1.4 4 3.4 4.8M12 2.5c3 0 5 1.6 5 4.2V14c0 2.2-1.4 4-3.4 4.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M12 19v2.5M8.2 21.5h7.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span class="brand-text"><strong>راسخون</strong><small>اختبار متشابهات القرآن</small></span>
+    </div>
+    <div class="actions">
+      <button class="icon-btn" type="button" aria-label="الإعدادات"><svg viewBox="0 0 24 24" fill="none"><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button class="icon-btn theme-toggle" type="button" aria-label="تبديل الوضع"><svg viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+    </div>
+  </header>
+  <div class="rule"></div>
+
+  <div class="chips">
+    <span class="chip"><b>السورة:</b> الأعراف</span>
+    <span class="chip"><b>الأسئلة:</b> ٢٠</span>
+    <span class="chip"><b>الرسم:</b> عثماني</span>
+    <span class="chip ghost">سياق الآيات</span>
+  </div>
+
+  <main class="card">
+    <div class="qmeta">
+      <span class="qcount">السؤال ٤ من ٢٠</span>
+      <span class="qloc">الأعراف · الآية ٤٥</span>
+    </div>
+    <h2 class="prompt">ما التكملة الصحيحة لختام الآية في الموضع المميَّز؟</h2>
+
+    <p class="verse" dir="rtl">الَّذِينَ يَصُدُّونَ عَن سَبِيلِ اللَّهِ وَيَبْغُونَهَا عِوَجًا وَهُم بِالْآخِرَةِ <mark class="gap"><span aria-hidden="true">······</span><span class="sr-only">الموضع الناقص</span></mark> <span class="endmark" aria-hidden="true">۞</span></p>
+
+    <div class="options">
+      <button class="opt correct" type="button" aria-pressed="true">
+        <span class="opt-key">أ</span><span class="opt-text">كَافِرُونَ</span>
+        <svg class="opt-check" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="opt" type="button" aria-pressed="false"><span class="opt-key">ب</span><span class="opt-text">هُمْ كَافِرُونَ</span></button>
+      <button class="opt" type="button" aria-pressed="false"><span class="opt-key">ج</span><span class="opt-text">هُمْ خَاسِرُونَ</span></button>
+    </div>
+
+    <div class="feedback">
+      <div class="fb-head"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3c.5 3 2 4.5 5 5-3 .5-4.5 2-5 5-.5-3-2-4.5-5-5 3-.5 4.5-2 5-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span>المتشابه المقابل</span></div>
+      <p class="fb-verse" dir="rtl">الَّذِينَ يَصُدُّونَ عَن سَبِيلِ اللَّهِ وَيَبْغُونَهَا عِوَجًا وَهُم بِالْآخِرَةِ <u class="diff">هُمْ كَافِرُونَ</u></p>
+      <p class="fb-loc">هود · الآية ١٩</p>
+      <p class="fb-note">الفرق: «هم» تثبت في هود وتسقط في الأعراف. لاحظ موضعها.</p>
+    </div>
+  </main>
+
+  <footer class="dots" role="progressbar" aria-valuenow="4" aria-valuemin="0" aria-valuemax="20" aria-label="التقدّم في الاختبار">
+    <span class="dot done" aria-hidden="true"></span><span class="dot done" aria-hidden="true"></span><span class="dot done" aria-hidden="true"></span>
+    <span class="dot active" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+  <span class="sr-only">أُجيب ٤ من ٢٠ سؤالاً</span>
+  </footer>
+  <p class="sig">طين · دفء الأرض وأندلس</p>
+</div>
+<script>
+  const t=document.querySelector('.theme-toggle');
+  const set=m=>{document.documentElement.classList.toggle('dark',m==='dark');t.innerHTML=m==='dark'?'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>':'<svg viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';try{localStorage.setItem('tin-theme',m)}catch(e){}};
+  let init='light';try{init=localStorage.getItem('tin-theme')||'light'}catch(e){}
+  set(init);t.addEventListener('click',()=>set(document.documentElement.classList.contains('dark')?'light':'dark'));
+</script>
+</body>
+</html>

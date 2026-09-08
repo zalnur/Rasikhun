@@ -1,0 +1,474 @@
+// Generates three self-contained Quran-quiz UI mockups from one shared
+// information architecture. The shared body markup is identical across all
+// three so the only thing that varies is the visual system (the point).
+// Run: node design/build.js
+
+const fs = require('fs');
+const path = require('path');
+
+/* ------------------------------------------------------------------ */
+/* Shared SVG glyphs. One stroke family, consistent 1.5px / round caps. */
+/* ------------------------------------------------------------------ */
+const SVG = {
+  // Rub el Hizb / 8-point star (khatim) brand mark, drawn as two squares.
+  khatim: `<svg class="logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+    <rect x="10" y="10" width="28" height="28" rx="2" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="10" y="10" width="28" height="28" rx="2" stroke="currentColor" stroke-width="1.6" transform="rotate(45 24 24)"/>
+  </svg>`,
+  gear: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/></svg>`,
+  moon: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  sun: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  check: `<svg class="opt-check" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  sparkle: `<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+};
+
+/* ------------------------------------------------------------------ */
+/* Shared body markup. Identical in every file. <span class="sig"/>   */
+/* is the only per-theme slot (so the footer names the concept).       */
+/* ------------------------------------------------------------------ */
+function body(concept) {
+  return `<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      ${SVG.khatim}
+      <span class="brand-text">
+        <strong>راسخون</strong>
+        <small>اختبار متشابهات القرآن</small>
+      </span>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" type="button" aria-label="الإعدادات">${SVG.gear}</button>
+      <button class="icon-btn theme-toggle" type="button" aria-label="تبديل الوضع الليلي">${SVG.moon}</button>
+    </div>
+  </header>
+
+  <div class="chips">
+    <span class="chip"><b>السورة:</b> الأعراف</span>
+    <span class="chip"><b>الأسئلة:</b> ٢٠</span>
+    <span class="chip"><b>الرسم:</b> عثماني</span>
+    <span class="chip ghost">سياق الآيات</span>
+  </div>
+
+  <main class="card">
+    <div class="qmeta">
+      <span class="qcount">السؤال ٤ من ٢٠</span>
+      <span class="qloc">الأعراف · الآية ٤٥</span>
+    </div>
+
+    <h2 class="prompt">ما التكملة الصحيحة لختام الآية في الموضع المميَّز؟</h2>
+
+    <p class="verse" dir="rtl">
+      الَّذِينَ يَصُدُّونَ عَن سَبِيلِ اللَّهِ وَيَبْغُونَهَا عِوَجًا وَهُم بِالْآخِرَةِ
+      <mark class="gap" title="الموضع المطلوب"><span aria-hidden="true">······</span><span class="sr-only">الموضع الناقص</span></mark>
+      <span class="endmark" aria-hidden="true">۞</span>
+    </p>
+
+    <div class="options" role="list">
+      <button class="opt correct" type="button" role="listitem" aria-pressed="true">
+        <span class="opt-key">أ</span>
+        <span class="opt-text">كَافِرُونَ</span>
+        ${SVG.check}
+      </button>
+      <button class="opt" type="button" role="listitem" aria-pressed="false">
+        <span class="opt-key">ب</span>
+        <span class="opt-text">هُمْ كَافِرُونَ</span>
+      </button>
+      <button class="opt" type="button" role="listitem" aria-pressed="false">
+        <span class="opt-key">ج</span>
+        <span class="opt-text">هُمْ خَاسِرُونَ</span>
+      </button>
+    </div>
+
+    <div class="feedback">
+      <div class="fb-head">${SVG.sparkle}<span>المتشابه المقابل</span></div>
+      <p class="fb-verse" dir="rtl">
+        الَّذِينَ يَصُدُّونَ عَن سَبِيلِ اللَّهِ وَيَبْغُونَهَا عِوَجًا وَهُم بِالْآخِرَةِ
+        <u class="diff">هُمْ كَافِرُونَ</u>
+      </p>
+      <p class="fb-loc">هود · الآية ١٩</p>
+      <p class="fb-note">الفرق: «هم» تثبت في هود وتسقط في الأعراف. لاحظ موضعها.</p>
+    </div>
+  </main>
+
+  <footer class="dots" role="progressbar" aria-valuenow="4" aria-valuemin="0" aria-valuemax="20" aria-label="التقدّم في الاختبار">
+    <span class="dot done" aria-hidden="true"></span>
+    <span class="dot done" aria-hidden="true"></span>
+    <span class="dot done" aria-hidden="true"></span>
+    <span class="dot active" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="dot" aria-hidden="true"></span>
+    <span class="sr-only">أُجيب ٤ من ٢٠ سؤالاً</span>
+  </footer>
+
+  <p class="signature">نموذج تصميم: ${concept}</p>
+</div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared structural CSS. Every value is a variable, themed per file.  */
+/* ------------------------------------------------------------------ */
+const COMMON = `
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  font-family:var(--font-ui);
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.6;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  background-image:var(--pattern,none);
+  background-size:var(--pattern-size,auto);
+  transition:background-color .35s ease,color .35s ease;
+}
+button{font-family:inherit;cursor:pointer}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.icon-btn:focus-visible,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{max-width:38rem;margin:0 auto;padding:1.4rem 1.25rem 3rem;display:flex;flex-direction:column;gap:1rem}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.brand{display:flex;align-items:center;gap:.7rem}
+.logo{width:2.4rem;height:2.4rem;color:var(--accent);flex:none}
+.brand-text{display:flex;flex-direction:column;line-height:1.25}
+.brand-text strong{font-family:var(--font-display);font-size:1.35rem;font-weight:700;letter-spacing:.01em}
+.brand-text small{font-size:.74rem;color:var(--muted)}
+.topbar-actions{display:flex;gap:.4rem}
+.icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:2.4rem;height:2.4rem;border-radius:var(--radius);
+  background:var(--surface);border:1px solid var(--border);color:var(--ink-soft);
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease;
+}
+.icon-btn svg{width:1.25rem;height:1.25rem}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink);border-color:var(--accent-line)}
+
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chip{
+  font-size:.78rem;padding:.32rem .7rem;border-radius:999px;
+  background:var(--surface);border:1px solid var(--border);color:var(--ink-soft);
+}
+.chip b{font-weight:600;color:var(--ink)}
+.chip.ghost{background:transparent;color:var(--accent);border-color:var(--accent-line)}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:1.5rem 1.5rem 1.6rem;box-shadow:var(--shadow);
+}
+.qmeta{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:.4rem}
+.qcount{font-size:.78rem;font-weight:600;color:var(--accent);letter-spacing:.02em}
+.qloc{font-size:.78rem;color:var(--muted)}
+.prompt{font-size:1.02rem;font-weight:600;margin:.2rem 0 1.1rem;color:var(--ink)}
+
+.verse{
+  font-family:var(--font-quran);
+  font-size:1.7rem;line-height:2.5;text-align:justify;
+  color:var(--ink);margin:0 0 1.4rem;padding:1.1rem 1.1rem;
+  background:var(--verse-bg);border-radius:var(--radius);
+  border:1px solid var(--verse-border);
+}
+.gap{
+  display:inline-block;min-width:5.5em;text-align:center;
+  color:transparent;background:var(--gap-bg);
+  border-radius:.35em;padding:0 .25em;margin:0 .15em;
+  box-shadow:var(--gap-shadow);
+}
+.endmark{color:var(--accent);font-size:1.4em;margin-inline-start:.2em}
+
+.options{display:flex;flex-direction:column;gap:.6rem}
+.opt{
+  display:flex;align-items:center;gap:.85rem;
+  text-align:start;padding:.85rem 1rem;
+  background:var(--surface-2);border:1.5px solid var(--border);border-radius:var(--radius);
+  color:var(--ink);transition:transform .15s ease,border-color .2s ease,background-color .2s ease;
+}
+.opt:hover{border-color:var(--accent-line);transform:translateY(-1px)}
+.opt-key{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1.9rem;height:1.9rem;flex:none;border-radius:999px;
+  background:var(--surface);border:1px solid var(--border);
+  font-size:.85rem;font-weight:700;color:var(--ink-soft);font-family:var(--font-ui);
+}
+.opt-text{font-family:var(--font-quran);font-size:1.45rem;letter-spacing:.01em}
+.opt-check{width:1.5rem;height:1.5rem;margin-inline-start:auto;flex:none;background:var(--good);color:var(--on-good);border-radius:999px;padding:.28rem}
+.opt.correct{
+  background:var(--good-soft);border-color:var(--good);color:var(--good-ink);
+}
+.opt.correct .opt-key{background:var(--good);border-color:var(--good);color:var(--on-good)}
+
+.feedback{
+  margin-top:1.2rem;padding:1rem 1.1rem;border-radius:var(--radius);
+  background:var(--accent-soft);border:1px solid var(--accent-line);
+}
+.fb-head{display:flex;align-items:center;gap:.45rem;font-size:.78rem;font-weight:700;color:var(--accent);margin-bottom:.55rem}
+.fb-head svg{width:1.05rem;height:1.05rem}
+.fb-verse{font-family:var(--font-quran);font-size:1.35rem;line-height:2.2;margin:.2rem 0;color:var(--ink)}
+.diff{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:1.5px;text-underline-offset:4px}
+.fb-loc{font-size:.76rem;color:var(--muted);margin:.1rem 0 .5rem}
+.fb-note{font-size:.84rem;color:var(--ink-soft);margin:0}
+
+.dots{display:flex;gap:.45rem;justify-content:center;margin-top:.5rem}
+.dot{width:.5rem;height:.5rem;border-radius:999px;background:var(--faint)}
+.dot.done{background:var(--accent)}
+.dot.active{background:var(--accent);transform:scale(1.5)}
+
+.signature{text-align:center;font-size:.74rem;color:var(--muted);margin-top:.2rem}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important}
+}
+`;
+
+/* ------------------------------------------------------------------ */
+/* THEME 1 — SUKUN (السكون): warm parchment + deep teal ink + sage.    */
+/* Calm scholar's reading desk. Warmth (mercy) over cool structure.    */
+/* ------------------------------------------------------------------ */
+const sukun = `
+:root{
+  --font-ui:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --font-display:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --font-quran:"Amiri","Scheherazade New",serif;
+  --bg:#f6f1e7; --surface:#fbf7ee; --surface-2:#f1e9d8;
+  --ink:#1d2b28; --ink-soft:#4a5853; --muted:#646d68; --faint:#d8cdb6;
+  --border:#e6dcc6; --accent-line:#cfe0d8;
+  --accent:#0f5147; --accent-soft:#e6eeea;
+  --good:#2f6f3f; --good-ink:#1c3f26; --good-soft:#e8f1e6; --on-good:#fff;
+  --verse-bg:#fdfaf3; --verse-border:#ece1ca;
+  --gap-bg:#0f5147; --gap-shadow:none;
+  --radius:.8rem; --radius-lg:1.1rem;
+  --shadow:0 1px 2px rgba(29,43,40,.05),0 12px 28px -22px rgba(29,43,40,.35);
+  --pattern:repeating-linear-gradient(45deg,transparent 0 22px,rgba(15,81,71,.022) 22px 23px);
+}
+.dark{
+  --bg:#131a18; --surface:#1b2321; --surface-2:#232c29;
+  --ink:#ece6d7; --ink-soft:#c0bcae; --muted:#8a938c; --faint:#2c3432;
+  --border:#2b3431; --accent-line:#2f443d;
+  --accent:#5fb3a4; --accent-soft:rgba(95,179,164,.12);
+  --good:#7fc488; --good-ink:#bff0c4; --good-soft:rgba(127,196,136,.13); --on-good:#0a1f12;
+  --verse-bg:#161d1b; --verse-border:#27302d;
+  --gap-bg:#5fb3a4;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 30px -22px rgba(0,0,0,.7);
+  --pattern:repeating-linear-gradient(45deg,transparent 0 22px,rgba(95,179,164,.03) 22px 23px);
+}
+.brand-text strong{font-weight:700}
+`;
+
+/* ------------------------------------------------------------------ */
+/* THEME 2 — NUR (النور): cool ivory + indigo ink + restrained copper.  */
+/* The Blue Quran, inverted to light. Copper = warmth, not gold cliché. */
+/* Monumental: Reem Kufi display font.                                 */
+/* ------------------------------------------------------------------ */
+const nur = `
+:root{
+  --font-ui:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --font-display:"Reem Kufi","IBM Plex Sans Arabic",sans-serif;
+  --font-quran:"Amiri",serif;
+  --bg:#f3f6fb; --surface:#fcfdfe; --surface-2:#eef2f8;
+  --ink:#1b2a4a; --ink-soft:#3b4a67; --muted:#636d85; --faint:#d7dcea;
+  --border:#dde3f0; --accent-line:#ecd9c8;
+  --accent:#9a4621; --accent-soft:#f6ece4;
+  --good:#1f7a5a; --good-ink:#0f3b2c; --good-soft:#e3f0ea; --on-good:#fff;
+  --verse-bg:#eaeff8; --verse-border:#d4dcef;
+  --gap-bg:#1b2a4a; --gap-shadow:none;
+  --radius:.7rem; --radius-lg:.9rem;
+  --shadow:0 1px 2px rgba(27,42,74,.05),0 14px 30px -24px rgba(27,42,74,.4);
+  --pattern:radial-gradient(circle at 50% 50%,rgba(27,42,74,.04) 1.5px,transparent 1.6px);
+  --pattern-size:26px 26px;
+}
+.dark{
+  --bg:#0d1626; --surface:#15203a; --surface-2:#1c2945;
+  --ink:#e7ecf7; --ink-soft:#b6c1d8; --muted:#7e8eae; --faint:#25314e;
+  --border:#273350; --accent-line:#3a2c22;
+  --accent:#d98a4e; --accent-soft:rgba(217,138,78,.14);
+  --good:#6fc69b; --good-ink:#c7eed6; --good-soft:rgba(111,198,155,.13); --on-good:#0a1f12;
+  --verse-bg:#111b33; --verse-border:#283450;
+  --gap-bg:#d98a4e;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 30px -22px rgba(0,0,0,.75);
+  --pattern:radial-gradient(circle at 50% 50%,rgba(217,138,78,.05) 1.5px,transparent 1.6px);
+}
+/* Nur's contested word is an illumination cartouche: double copper border. */
+.gap{border:1.5px solid var(--accent);outline:1px solid var(--accent);outline-offset:2px;border-radius:.3em}
+.brand-text strong{font-family:var(--font-display);letter-spacing:.02em}
+`;
+
+/* ------------------------------------------------------------------ */
+/* THEME 3 — MIZAN (الميزان): cool graphite + jade + paper.             */
+/* The balance. Structured, organized, reliable, strong. Most modern.   */
+/* Readex Pro UI for a clean, consistent, geometric voice.              */
+/* ------------------------------------------------------------------ */
+const mizan = `
+:root{
+  --font-ui:"Readex Pro",system-ui,sans-serif;
+  --font-display:"Readex Pro",system-ui,sans-serif;
+  --font-quran:"Amiri",serif;
+  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef1f4;
+  --ink:#1f2730; --ink-soft:#44515d; --muted:#65707d; --faint:#d9dee4;
+  --border:#e3e8ed; --accent-line:#cfe7e0;
+  --accent:#0e7d6a; --accent-soft:#eaf5f1;
+  --good:#1a7f4e; --good-ink:#0d3a22; --good-soft:#e8f4ee; --on-good:#fff;
+  --verse-bg:#fbfcfd; --verse-border:#e3e8ed;
+  --gap-bg:#0e7d6a; --gap-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+  --radius:.55rem; --radius-lg:.8rem;
+  --shadow:0 1px 2px rgba(31,39,48,.04),0 10px 24px -22px rgba(31,39,48,.4);
+  --pattern:repeating-linear-gradient(0deg,transparent 0 24px,rgba(14,125,106,.018) 24px 25px),
+            repeating-linear-gradient(90deg,transparent 0 24px,rgba(14,125,106,.018) 24px 25px);
+}
+.dark{
+  --bg:#10151a; --surface:#171e25; --surface-2:#1f2832;
+  --ink:#e8edf1; --ink-soft:#bcc6cf; --muted:#87939f; --faint:#28313b;
+  --border:#28313b; --accent-line:#22433b;
+  --accent:#3bb39a; --accent-soft:rgba(59,179,154,.12);
+  --good:#6fcf97; --good-ink:#c4f0d5; --good-soft:rgba(111,207,151,.13); --on-good:#0a1f12;
+  --verse-bg:#141b21; --verse-border:#26303a;
+  --gap-bg:#3bb39a;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 14px 28px -22px rgba(0,0,0,.75);
+  --pattern:repeating-linear-gradient(0deg,transparent 0 24px,rgba(59,179,154,.03) 24px 25px),
+            repeating-linear-gradient(90deg,transparent 0 24px,rgba(59,179,154,.03) 24px 25px);
+}
+/* Mizan's contested word is a crisp structured outline, not a fill. */
+.gap{background:transparent!important;color:transparent!important;border:1.5px dashed var(--accent);box-shadow:none}
+.opt{border-width:1px}
+.opt.correct{border-width:1.5px}
+`;
+
+/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/* UNIFIED — Rasikhun: Sukun palette + Nur typography (Reem Kufi) +    */
+/* Mizan balance (tighter radius, cross-hatch grid, measured rhythm).  */
+/* ------------------------------------------------------------------ */
+const merged = `
+:root{
+  --font-ui:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  --font-display:"Reem Kufi","IBM Plex Sans Arabic",sans-serif;
+  --font-quran:"Amiri","Scheherazade New",serif;
+  --bg:#f6f1e7; --surface:#fbf7ee; --surface-2:#f1e9d8;
+  --ink:#1d2b28; --ink-soft:#4a5853; --muted:#646d68; --faint:#d8cdb6;
+  --border:#e6dcc6; --accent-line:#cfe0d8;
+  --accent:#0f5147; --accent-soft:#e6eeea;
+  --good:#2f6f3f; --good-ink:#1c3f26; --good-soft:#e8f1e6; --on-good:#fff;
+  --verse-bg:#fdfaf3; --verse-border:#ece1ca;
+  --gap-bg:#0f5147;
+  --radius:.65rem; --radius-lg:.9rem;
+  --shadow:0 1px 2px rgba(29,43,40,.05),0 14px 30px -24px rgba(29,43,40,.4);
+  --pattern:repeating-linear-gradient(0deg,transparent 0 24px,rgba(15,81,71,.022) 24px 25px),
+            repeating-linear-gradient(90deg,transparent 0 24px,rgba(15,81,71,.022) 24px 25px);
+}
+.dark{
+  --bg:#131a18; --surface:#1b2321; --surface-2:#232c29;
+  --ink:#ece6d7; --ink-soft:#c0bcae; --muted:#8a938c; --faint:#2c3432;
+  --border:#2b3431; --accent-line:#2f443d;
+  --accent:#5fb3a4; --accent-soft:rgba(95,179,164,.12);
+  --good:#7fc488; --good-ink:#bff0c4; --good-soft:rgba(127,196,136,.13); --on-good:#0a1f12;
+  --verse-bg:#161d1b; --verse-border:#27302d;
+  --gap-bg:#5fb3a4;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 30px -22px rgba(0,0,0,.7);
+  --pattern:repeating-linear-gradient(0deg,transparent 0 24px,rgba(95,179,164,.03) 24px 25px),
+            repeating-linear-gradient(90deg,transparent 0 24px,rgba(95,179,164,.03) 24px 25px);
+}
+/* Nur's monumental Reem Kufi on the wordmark and the question prompt. */
+.brand-text strong{font-size:1.45rem;letter-spacing:.015em}
+.prompt{font-family:var(--font-display);font-size:1.16rem;font-weight:600}
+/* Mizan's measured balance: tighter corners, more breathing, even rhythm. */
+.app{gap:1.1rem}
+.card{padding:1.75rem 1.75rem 1.85rem}
+.qmeta{margin-bottom:.5rem}
+.verse{font-size:1.78rem;padding:1.4rem 1.4rem}
+.options{gap:.6rem}
+.opt{padding:.9rem 1.05rem}
+.opt-text{font-size:1.5rem}
+`;
+
+const themes = [
+  { key:'rasikhun', name:'راسخون', en:'Unified', css:merged, featured:true,
+    concept:'المختار · دفء السكون وخط النور وتوازن الميزان',
+    fonts:'IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&family=Amiri:wght@400;700',
+    words:'هادئ · صافٍ · موزون', dots:['#f6f1e7','#fbf7ee','#0f5147','#2f6f3f'] },
+  { key:'sukun', name:'السكون', en:'Sukun', css:sukun, concept:'السكون · هدأة المصحف',
+    fonts:'IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Amiri:wght@400;700',
+    words:'دافئ · هادئ · رحيم', dots:['#f6f1e7','#fbf7ee','#0f5147','#2f6f3f'] },
+  { key:'nur', name:'النور', en:'Nur', css:nur, concept:'النور · نور على نور',
+    fonts:'IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&family=Amiri:wght@400;700',
+    words:'صافٍ · مضيء · ثابت', dots:['#f3f6fb','#fcfdfe','#1b2a4a','#9a4621'] },
+  { key:'mizan', name:'الميزان', en:'Mizan', css:mizan, concept:'الميزان · توازن ودقة',
+    fonts:'Readex+Pro:wght@400;500;600;700&family=Amiri:wght@400;700',
+    words:'منظَّم · موثوق · قوي', dots:['#f6f7f9','#ffffff','#0e7d6a','#1a7f4e'] },
+// (Mizan accent-soft nudged to #eaf5f1 for AA on the feedback-label)
+];
+
+const script = `<script>
+  const t=document.querySelector('.theme-toggle');
+  const set=m=>{document.documentElement.classList.toggle('dark',m==='dark');t.innerHTML=m==='dark'?'${SVG.sun}':'${SVG.moon}';try{localStorage.setItem('rsk-theme',m)}catch(e){}};
+  let init='light';try{init=localStorage.getItem('rsk-theme')||'light'}catch(e){}
+  set(init);t.addEventListener('click',()=>set(document.documentElement.classList.contains('dark')?'light':'dark'));
+<\/script>`;
+
+function page(theme){
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>راسخون · ${theme.name}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=${theme.fonts}&display=swap" rel="stylesheet">
+<style>${COMMON}\n${theme.css}</style>
+</head>
+<body>
+${body(theme.concept)}
+${script}
+</body>
+</html>`;
+}
+
+/* index.html: small comparison nav */
+const index = `<!doctype html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>راسخون · مقارنة النماذج</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:"IBM Plex Sans Arabic",sans-serif;background:#f3efe7;color:#1d2b28;min-height:100vh;padding:2.5rem 1.25rem 4rem}
+.wrap{max-width:52rem;margin:0 auto}
+h1{font-size:1.7rem;font-weight:700;margin:0 0 .35rem}
+.lead{color:#4a5853;font-size:.98rem;margin:0 0 .3rem}
+.note{color:#575f5a;font-size:.85rem;margin:0 0 2rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem}
+a.card{display:block;text-decoration:none;color:inherit;background:#fbf7ee;border:1px solid #e6dcc6;border-radius:1rem;padding:1.3rem;transition:transform .18s ease,box-shadow .18s ease}
+a.card:hover{transform:translateY(-3px);box-shadow:0 16px 30px -22px rgba(29,43,40,.5)}
+.kw{font-size:.74rem;color:#575f5a;letter-spacing:.02em}
+.card h2{font-size:1.4rem;margin:.15rem 0 .1rem}
+.card p{font-size:.86rem;color:#4a5853;margin:.2rem 0 1rem}
+.swatches{display:flex;gap:.4rem;margin-bottom:1rem}
+.swatches i{width:1.6rem;height:1.6rem;border-radius:.4rem;border:1px solid rgba(0,0,0,.06);display:block}
+.go{font-size:.85rem;font-weight:600;color:#0f5147}
+.foot{margin-top:2.2rem;font-size:.8rem;color:#575f5a}
+a.card.featured{border-color:#0f5147;box-shadow:0 0 0 1.5px #0f5147 inset,0 16px 30px -22px rgba(15,81,71,.55)}
+.badge{display:inline-block;font-size:.72rem;font-weight:700;color:#fff;background:#0f5147;padding:.18rem .6rem;border-radius:999px;margin-bottom:.6rem}
+</style></head><body><div class="wrap">
+<h1>راسخون · نماذج التصميم</h1>
+<p class="lead">ثلاثة اتجاهات بصرية لنفس الشاشة. افتح كل نموذج لرؤيته بالوضعين الفاتح والداكن.</p>
+<p class="note">الآية المعروضة: الأعراف ٤٥ مقابل هود ١٩ (يختلفان بكلمة «هم»). بيانات حقيقية من ملف المشروع.</p>
+<div class="grid">
+${themes.map(t=>`<a class="card${t.featured?' featured':''}" href="${t.key}.html">
+  ${t.featured?'<span class="badge">النموذج المختار</span>':''}
+  <span class="kw">${t.words}</span>
+  <h2>${t.name}</h2>
+  <p>${t.concept}</p>
+  <div class="swatches">${t.dots.map(c=>`<i style="background:${c}"></i>`).join('')}</div>
+  <span class="go">فتح النموذج ←</span>
+</a>`).join('')}
+</div>
+<p class="foot">خامس خيار احتياطي (ذهبي على أبيض/أسود) جاهز عند الطلب، لكنه لم يُضمَّن لأنه النمط الشائع الذي نتجنّبه هنا.</p>
+</div></body></html>`;
+
+const out = path.join(__dirname);
+themes.forEach(t => fs.writeFileSync(path.join(out, t.key + '.html'), page(t)));
+fs.writeFileSync(path.join(out, 'index.html'), index);
+console.log('Wrote: index.html, ' + themes.map(t=>t.key+'.html').join(', '));
